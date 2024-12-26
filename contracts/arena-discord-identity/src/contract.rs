@@ -7,7 +7,7 @@ use cw_ownable::assert_owner;
 
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{discord_identity, DISCORD_CONNECTIONS, FAUCET_AMOUNT},
+    state::{discord_identity, DISCORD_CONNECTIONS, FAUCET_AMOUNT, HAS_DISCORD_RECEIVED},
     ContractError,
 };
 
@@ -44,10 +44,6 @@ pub fn execute(
     info: MessageInfo,
     msg: ExecuteMsg,
 ) -> Result<Response, ContractError> {
-    if !matches!(msg, ExecuteMsg::SetConnections { .. }) && info.sender != env.contract.address {
-        assert_owner(deps.storage, &info.sender)?;
-    }
-
     match msg {
         ExecuteMsg::SetConnections { connections } => {
             let discord_profile = discord_identity().load(deps.storage, &info.sender)?;
@@ -60,19 +56,16 @@ pub fn execute(
             addr,
             discord_profile,
         } => {
+            assert_owner(deps.storage, &info.sender)?;
+
             let discord_identity = discord_identity();
             let user = deps.api.addr_validate(&addr)?;
             let mut msgs = vec![];
             if !discord_identity.has(deps.storage, &user)
-                && discord_identity
-                    .idx
-                    .discord_id
-                    .prefix(discord_profile.user_id.u64())
-                    .range(deps.storage, None, None, Order::Descending)
-                    .collect::<StdResult<Vec<_>>>()?
-                    .is_empty()
+                && !HAS_DISCORD_RECEIVED.has(deps.storage, discord_profile.user_id.u64())
             {
                 let faucet_amount = FAUCET_AMOUNT.load(deps.storage)?;
+                HAS_DISCORD_RECEIVED.save(deps.storage, discord_profile.user_id.u64(), &())?;
 
                 if deps
                     .querier
@@ -97,13 +90,24 @@ pub fn execute(
                 .add_attribute("discord_id", discord_profile.user_id.to_string()))
         }
         ExecuteMsg::SetFaucetAmount { amount } => {
+            if info.sender != env.contract.address {
+                assert_owner(deps.storage, &info.sender)?;
+            }
+
             FAUCET_AMOUNT.save(deps.storage, &amount)?;
 
             Ok(Response::new()
                 .add_attribute("action", "set_faucet_amount")
                 .add_attribute("amount", amount.to_string()))
         }
+        ExecuteMsg::RemoveProfile {} => {
+            discord_identity().remove(deps.storage, &info.sender)?;
+
+            Ok(Response::new().add_attribute("action", "remove_profile"))
+        }
         ExecuteMsg::Withdraw {} => {
+            assert_owner(deps.storage, &info.sender)?;
+
             let funds = deps
                 .querier
                 .query_all_balances(env.contract.address.to_string())?;
@@ -152,8 +156,21 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, _msg: MigrateMsg) -> StdResult<Response> {
+pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response> {
     let _version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
+
+    if matches!(msg, MigrateMsg::SetHasReceived {}) {
+        for (_, discord_profile) in discord_identity()
+            .idx
+            .discord_id
+            .range(deps.storage, None, None, Order::Descending)
+            .collect::<StdResult<Vec<_>>>()?
+        {
+            if !HAS_DISCORD_RECEIVED.has(deps.storage, discord_profile.user_id.u64()) {
+                HAS_DISCORD_RECEIVED.save(deps.storage, discord_profile.user_id.u64(), &())?;
+            }
+        }
+    }
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())

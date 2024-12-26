@@ -121,29 +121,25 @@ pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response,
                 enrollment_id.u128(),
                 |x| -> StdResult<_> {
                     if let Some(mut enrollment) = x {
-                        match &enrollment.competition_type {
+                        match &mut enrollment.competition_type {
                             CompetitionType::Tournament {
                                 elimination_type,
-                                distribution,
-                            } => match elimination_type {
-                                EliminationType::SingleElimination {
-                                    play_third_place_match: _,
-                                } => {
-                                    enrollment.competition_type = CompetitionType::Tournament {
-                                        distribution: distribution.clone(),
-                                        elimination_type: EliminationType::SingleElimination {
-                                            play_third_place_match: false,
-                                        },
-                                    }
-                                }
-                                _ => {}
-                            },
+                                distribution: _,
+                            } if matches!(
+                                elimination_type,
+                                EliminationType::SingleElimination { .. }
+                            ) =>
+                            {
+                                *elimination_type = EliminationType::SingleElimination {
+                                    play_third_place_match: false,
+                                };
+                            }
                             _ => {}
-                        }
+                        };
 
                         Ok(enrollment)
                     } else {
-                        return Err(StdError::generic_err("Enrollment not found"));
+                        Err(StdError::generic_err("Enrollment not found"))
                     }
                 },
             )?;

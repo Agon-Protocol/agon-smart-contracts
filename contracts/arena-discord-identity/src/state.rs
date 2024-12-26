@@ -28,3 +28,4 @@ pub fn discord_identity<'a>() -> IndexedMap<'a, &'a Addr, DiscordProfile, Discor
 
 pub const DISCORD_CONNECTIONS: Map<u64, Vec<DiscordConnection>> = Map::new("discord_connections");
 pub const FAUCET_AMOUNT: Item<Coin> = Item::new("faucet_amount");
+pub const HAS_DISCORD_RECEIVED: Map<u64, ()> = Map::new("has_discord_received");

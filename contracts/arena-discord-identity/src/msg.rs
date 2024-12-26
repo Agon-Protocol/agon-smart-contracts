@@ -21,6 +21,7 @@ pub enum ExecuteMsg {
     SetFaucetAmount {
         amount: Coin,
     },
+    RemoveProfile {},
     Withdraw {},
 }
 
@@ -39,6 +40,7 @@ pub enum QueryMsg {
 #[cw_serde]
 pub enum MigrateMsg {
     FromCompatible {},
+    SetHasReceived {},
 }
 
 #[cw_serde]

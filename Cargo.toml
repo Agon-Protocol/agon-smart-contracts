@@ -7,9 +7,14 @@ edition = "2021"
 license = "GPL-3.0-or-later"
 license-file = "LICENSE"
 repository = "https://github.com/Arena-DAO/arena-smart-contracts"
-version = "2.1.0"
+version = "2.2.0"
+
+[workspace.metadata]
+documentation = "https://docs.arenadao.org"
+issues = "https://github.com/arena-dao/arena-smart-contracts/issues"
 
 [profile.release]
+strip = true
 codegen-units = 1
 opt-level = 3
 debug = false
@@ -21,9 +26,9 @@ incremental = false
 overflow-checks = true
 
 [workspace.dependencies]
-cosmwasm-std = { version = "1.5.7", features = ["cosmwasm_1_4"] }
+cosmwasm-std = { version = "1.5.9", features = ["cosmwasm_1_4"] }
 cosmwasm-storage = "1.5.2"
-cosmwasm-schema = "1.5.7"
+cosmwasm-schema = "1.5.9"
 cw-utils = "1.0.3"
 thiserror = "1.0.63"
 cw-storage-plus = "1.2.0"
