@@ -74,6 +74,9 @@ pub fn execute(
             group_contract_info,
             require_team_size,
         ),
+        ExecuteMsg::SetRankings { id, rankings } => {
+            execute::set_rankings(deps, env, info, id, rankings)
+        }
         ExecuteMsg::TriggerExpiration { id, escrow_id } => {
             execute::trigger_expiration(deps, env, info, id, escrow_id)
         }

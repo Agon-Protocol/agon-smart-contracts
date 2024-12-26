@@ -1,7 +1,7 @@
 use arena_interface::{
     competition::msg::EscrowInstantiateInfo,
     core::{CompetitionModuleQuery, CompetitionModuleResponse},
-    group::{self, GroupContractInfo},
+    group::{self, GroupContractInfo, MemberMsg},
 };
 use arena_league_module::msg::LeagueInstantiateExt;
 use arena_tournament_module::{msg::TournamentInstantiateExt, state::EliminationType};
@@ -610,4 +610,33 @@ fn get_min_min_members(competition_type: &CompetitionType) -> Uint64 {
             }
         },
     }
+}
+
+pub fn set_rankings(
+    deps: DepsMut,
+    _env: Env,
+    info: MessageInfo,
+    id: Uint128,
+    rankings: Vec<MemberMsg<String>>,
+) -> Result<Response, ContractError> {
+    let enrollment = enrollment_entries().load(deps.storage, id.u128())?;
+
+    ensure!(
+        enrollment.host == info.sender,
+        ContractError::Unauthorized {}
+    );
+
+    let msg = WasmMsg::Execute {
+        contract_addr: enrollment.group_contract.to_string(),
+        msg: to_json_binary(&group::ExecuteMsg::UpdateMembers {
+            to_add: None,
+            to_update: Some(rankings),
+            to_remove: None,
+        })?,
+        funds: vec![],
+    };
+
+    Ok(Response::new()
+        .add_attribute("action", "set_rankings")
+        .add_message(msg))
 }

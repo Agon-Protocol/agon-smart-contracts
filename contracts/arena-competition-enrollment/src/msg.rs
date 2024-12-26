@@ -1,4 +1,4 @@
-use arena_interface::fees::FeeInformation;
+use arena_interface::{fees::FeeInformation, group::MemberMsg};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, Uint128, Uint64};
 use cw_utils::Expiration;
@@ -47,6 +47,10 @@ pub enum ExecuteMsg {
     ForceWithdraw {
         id: Uint128,
         members: Vec<String>,
+    },
+    SetRankings {
+        id: Uint128,
+        rankings: Vec<MemberMsg<String>>,
     },
 }
 
