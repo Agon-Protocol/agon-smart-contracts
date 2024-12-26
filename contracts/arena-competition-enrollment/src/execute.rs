@@ -12,7 +12,7 @@ use cosmwasm_std::{
 };
 use cw_balance::{BalanceUnchecked, MemberBalanceUnchecked};
 use cw_utils::{must_pay, Expiration};
-use dao_interface::state::ModuleInstantiateInfo;
+use dao_interface::{state::ModuleInstantiateInfo, voting::VotingPowerAtHeightResponse};
 use itertools::Itertools as _;
 use sha2::{Digest, Sha256};
 
@@ -400,6 +400,7 @@ pub fn enroll(
     env: Env,
     info: MessageInfo,
     id: Uint128,
+    team: Option<String>,
 ) -> Result<Response, ContractError> {
     let entry = enrollment_entries().load(deps.storage, id.u128())?;
 
@@ -428,35 +429,57 @@ pub fn enroll(
         ContractError::EnrollmentMaxMembers {}
     );
 
-    // Ensure team size requirement is handled
-    if let Some(required_team_size) = entry.required_team_size {
-        let dao_voting_module: Addr = deps.querier.query_wasm_smart(
-            info.sender.to_string(),
-            &dao_interface::msg::QueryMsg::VotingModule {},
-        )?;
-        let group_contract: Addr = deps.querier.query_wasm_smart(
-            dao_voting_module,
-            &dao_voting_cw4::msg::QueryMsg::GroupContract {},
-        )?;
-        let member_list_response: cw4::MemberListResponse = deps.querier.query_wasm_smart(
-            group_contract,
-            &cw4::Cw4QueryMsg::ListMembers {
-                start_after: None,
-                limit: Some(TEAM_SIZE_LIMIT),
+    // Set correct member
+    let member = if let Some(team) = team {
+        let team = deps.api.addr_validate(&team)?;
+        let voting_power_response: VotingPowerAtHeightResponse = deps.querier.query_wasm_smart(
+            team.to_string(),
+            &dao_interface::msg::QueryMsg::VotingPowerAtHeight {
+                address: info.sender.to_string(),
+                height: None,
             },
         )?;
 
-        ensure!(
-            member_list_response.members.len() as u32 == required_team_size,
-            ContractError::TeamSizeMismatch { required_team_size }
-        );
+        if voting_power_response.power.is_zero() {
+            return Err(ContractError::NotTeamMember {});
+        }
+
+        team
+    } else {
+        info.sender
+    };
+
+    // Ensure team size requirement is handled
+    if let Some(required_team_size) = entry.required_team_size {
+        if required_team_size != 1 || deps.querier.query_wasm_contract_info(&member).is_ok() {
+            let dao_voting_module: Addr = deps.querier.query_wasm_smart(
+                member.to_string(),
+                &dao_interface::msg::QueryMsg::VotingModule {},
+            )?;
+            let group_contract: Addr = deps.querier.query_wasm_smart(
+                dao_voting_module,
+                &dao_voting_cw4::msg::QueryMsg::GroupContract {},
+            )?;
+            let member_list_response: cw4::MemberListResponse = deps.querier.query_wasm_smart(
+                group_contract,
+                &cw4::Cw4QueryMsg::ListMembers {
+                    start_after: None,
+                    limit: Some(TEAM_SIZE_LIMIT),
+                },
+            )?;
+
+            ensure!(
+                member_list_response.members.len() as u32 == required_team_size,
+                ContractError::TeamSizeMismatch { required_team_size }
+            );
+        }
     }
 
     let msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: entry.group_contract.to_string(),
         msg: to_json_binary(&group::ExecuteMsg::UpdateMembers {
             to_add: Some(vec![group::AddMemberMsg {
-                addr: info.sender.to_string(),
+                addr: member.to_string(),
                 seed: None,
             }]),
             to_remove: None,
@@ -577,8 +600,11 @@ fn get_min_min_members(competition_type: &CompetitionType) -> Uint64 {
             distribution,
         } => match elimination_type {
             EliminationType::SingleElimination {
-                play_third_place_match: _,
-            } => Uint64::new(std::cmp::max(4, distribution.len()) as u64),
+                play_third_place_match,
+            } => Uint64::new(std::cmp::max(
+                if *play_third_place_match { 4 } else { 3 },
+                distribution.len(),
+            ) as u64),
             EliminationType::DoubleElimination => {
                 Uint64::new(std::cmp::max(3, distribution.len()) as u64)
             }

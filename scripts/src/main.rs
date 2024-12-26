@@ -3,7 +3,8 @@ use cw_orch::{anyhow, prelude::*};
 use orch_interface::{
     arena_competition_enrollment::ArenaCompetitionEnrollmentContract,
     arena_core::ArenaCoreContract, arena_discord_identity::ArenaDiscordIdentityContract,
-    arena_group::ArenaGroupContract, arena_league_module::ArenaLeagueModuleContract,
+    arena_escrow::ArenaEscrowContract, arena_group::ArenaGroupContract,
+    arena_league_module::ArenaLeagueModuleContract,
     arena_payment_registry::ArenaPaymentRegistryContract,
     arena_token_gateway::ArenaTokenGatewayContract,
     arena_tournament_module::ArenaTournamentModuleContract,
@@ -51,6 +52,7 @@ enum DeployComponent {
     Identity,
     DaoCore,
     Registry,
+    Escrow,
 }
 
 fn parse_command(args: &[String]) -> Command {
@@ -75,6 +77,7 @@ fn parse_command(args: &[String]) -> Command {
         "group" => DeployComponent::Group,
         "identity" => DeployComponent::Identity,
         "registry" => DeployComponent::Registry,
+        "escrow" => DeployComponent::Escrow,
         _ => return Command::Unknown,
     };
 
@@ -98,6 +101,7 @@ fn deploy(network: Network, component: DeployComponent) -> anyhow::Result<()> {
         DeployComponent::Group => deploy_group(daemon)?,
         DeployComponent::Identity => deploy_identity(daemon)?,
         DeployComponent::Registry => deploy_registry(daemon)?,
+        DeployComponent::Escrow => deploy_escrow(daemon)?,
     }
 
     Ok(())
@@ -164,6 +168,12 @@ fn deploy_identity(daemon: Daemon) -> anyhow::Result<()> {
 fn deploy_registry(daemon: Daemon) -> anyhow::Result<()> {
     let registry = ArenaPaymentRegistryContract::new(daemon);
     registry.upload()?;
+    Ok(())
+}
+
+fn deploy_escrow(daemon: Daemon) -> anyhow::Result<()> {
+    let escrow = ArenaEscrowContract::new(daemon);
+    escrow.upload()?;
     Ok(())
 }
 

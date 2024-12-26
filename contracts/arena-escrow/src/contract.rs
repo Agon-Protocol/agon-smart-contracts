@@ -34,12 +34,6 @@ pub fn instantiate_contract(
 ) -> Result<(), ContractError> {
     cw_ownable::initialize_owner(deps.storage, deps.api, Some(info.sender.as_str()))?;
 
-    if dues.is_empty() {
-        return Err(ContractError::InvalidDue {
-            msg: "None due".to_string(),
-        });
-    }
-
     IS_LOCKED.save(deps.storage, &false)?;
     for member_balance in dues {
         let member_balance = member_balance.into_checked(deps.as_ref())?;

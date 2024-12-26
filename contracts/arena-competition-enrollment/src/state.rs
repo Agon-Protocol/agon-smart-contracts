@@ -175,7 +175,11 @@ impl CompetitionInfo {
                     .querier
                     .query_wasm_smart::<CompetitionResponse<Empty>>(
                         module_addr.to_string(),
-                        &arena_interface::competition::msg::QueryBase::<Empty, Empty, Empty>::Competition {
+                        &arena_interface::competition::msg::QueryBase::Competition::<
+                            Empty,
+                            Empty,
+                            Empty,
+                        > {
                             competition_id: id,
                         },
                     )?;

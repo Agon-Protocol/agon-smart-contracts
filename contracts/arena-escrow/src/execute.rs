@@ -31,12 +31,6 @@ pub fn set_dues(
         assert_owner(deps.storage, &info.sender)?;
     }
 
-    if dues.is_empty() {
-        return Err(ContractError::InvalidDue {
-            msg: "None due".to_string(),
-        });
-    }
-
     IS_LOCKED.save(deps.storage, &false)?;
     for member_balance in dues {
         let member_balance = member_balance.into_checked(deps.as_ref())?;
@@ -196,10 +190,12 @@ fn receive_balance(
                 if let Some(owner) = get_ownership(deps.storage)?.owner {
                     msgs.push(CosmosMsg::Wasm(cosmwasm_std::WasmMsg::Execute {
                         contract_addr: owner.to_string(),
-                        msg: to_json_binary(&arena_interface::competition::msg::ExecuteBase::<
-                            Empty,
-                            Empty,
-                        >::ActivateCompetition {})?,
+                        msg: to_json_binary(
+                            &arena_interface::competition::msg::ExecuteBase::ActivateCompetition::<
+                                Empty,
+                                Empty,
+                            > {},
+                        )?,
                         funds: vec![],
                     }));
                 }
@@ -328,7 +324,7 @@ pub fn distribute(
     // Query payment registry
     let payment_registry: Option<String> = deps.querier.query_wasm_smart(
         info.sender.to_string(),
-        &arena_interface::competition::msg::QueryBase::<Empty, Empty, Empty>::PaymentRegistry {},
+        &arena_interface::competition::msg::QueryBase::PaymentRegistry::<Empty, Empty, Empty> {},
     )?;
     let payment_registry = payment_registry
         .map(|x| deps.api.addr_validate(&x))

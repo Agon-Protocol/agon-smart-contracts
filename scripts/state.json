@@ -2,10 +2,10 @@
   "neutron": {
     "neutron-1": {
       "code_ids": {
-        "arena_competition_enrollment": 2871,
+        "arena_competition_enrollment": 2876,
         "arena_core": 2217,
-        "arena_discord_identity": 2819,
-        "arena_escrow": 2216,
+        "arena_discord_identity": 2874,
+        "arena_escrow": 2875,
         "arena_group": 2224,
         "arena_league_module": 2219,
         "arena_payment_registry": 2868,
@@ -20,10 +20,10 @@
     },
     "pion-1": {
       "code_ids": {
-        "arena_competition_enrollment": 8677,
+        "arena_competition_enrollment": 8710,
         "arena_core": 7599,
         "arena_discord_identity": 8604,
-        "arena_escrow": 7598,
+        "arena_escrow": 8709,
         "arena_group": 7607,
         "arena_league_module": 7616,
         "arena_payment_registry": 8686,

@@ -77,7 +77,7 @@ pub fn execute(
         ExecuteMsg::TriggerExpiration { id, escrow_id } => {
             execute::trigger_expiration(deps, env, info, id, escrow_id)
         }
-        ExecuteMsg::Enroll { id } => execute::enroll(deps, env, info, id),
+        ExecuteMsg::Enroll { id, team } => execute::enroll(deps, env, info, id, team),
         ExecuteMsg::Withdraw { id } => execute::withdraw(deps, env, info, id),
         ExecuteMsg::ForceWithdraw { id, members } => {
             execute::force_withdraw(deps, env, info, id, members)

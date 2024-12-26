@@ -37,6 +37,9 @@ pub enum ExecuteMsg {
     #[cw_orch(payable)]
     Enroll {
         id: Uint128,
+        /// Optional team to enroll
+        /// Only callable by a member
+        team: Option<String>,
     },
     Withdraw {
         id: Uint128,

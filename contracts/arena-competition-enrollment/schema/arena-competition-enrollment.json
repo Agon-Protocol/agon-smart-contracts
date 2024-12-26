@@ -138,6 +138,13 @@
             "properties": {
               "id": {
                 "$ref": "#/definitions/Uint128"
+              },
+              "team": {
+                "description": "Optional team to enroll Only callable by a member",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "additionalProperties": false

@@ -101,9 +101,10 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
     // Enroll a member
     arena.arena_competition_enrollment.set_sender(&teams[0]);
 
-    let res = arena
-        .arena_competition_enrollment
-        .enroll(Uint128::one(), &coins(1000, DENOM))?;
+    let res =
+        arena
+            .arena_competition_enrollment
+            .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -114,9 +115,10 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
     assert!(members.len() == 1);
 
     // Try to enroll the same member again (should fail)
-    let result = arena
-        .arena_competition_enrollment
-        .enroll(Uint128::one(), &coins(1000, DENOM));
+    let result =
+        arena
+            .arena_competition_enrollment
+            .enroll(Uint128::one(), None, &coins(1000, DENOM));
     assert!(result.is_err());
 
     // Withdraw a member before expiration
@@ -131,7 +133,7 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
     // Enroll again
     arena
         .arena_competition_enrollment
-        .enroll(Uint128::one(), &coins(1000, DENOM))?;
+        .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
 
     // Trigger expiration
     arena.arena_competition_enrollment.set_sender(&admin);
@@ -277,15 +279,16 @@ fn test_enrollment_capacity() -> anyhow::Result<()> {
         arena.arena_competition_enrollment.set_sender(team);
         arena
             .arena_competition_enrollment
-            .enroll(Uint128::one(), &coins(1000, DENOM))?;
+            .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
     }
 
     // Try to enroll a fifth member (should fail)
     arena.arena_competition_enrollment.set_sender(&teams[4]);
 
-    let result = arena
-        .arena_competition_enrollment
-        .enroll(Uint128::one(), &coins(1000, DENOM));
+    let result =
+        arena
+            .arena_competition_enrollment
+            .enroll(Uint128::one(), None, &coins(1000, DENOM));
     assert!(result.is_err());
 
     Ok(())
@@ -360,7 +363,7 @@ fn test_successful_tournament_creation() -> anyhow::Result<()> {
         arena.arena_competition_enrollment.set_sender(team);
         arena
             .arena_competition_enrollment
-            .enroll(Uint128::one(), &coins(1000, DENOM))?;
+            .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
     }
 
     // Trigger expiration
@@ -443,11 +446,11 @@ fn test_successful_wager_creation() -> anyhow::Result<()> {
     arena.arena_competition_enrollment.set_sender(&team1);
     arena
         .arena_competition_enrollment
-        .enroll(Uint128::one(), &coins(1000, DENOM))?;
+        .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
     arena.arena_competition_enrollment.set_sender(&team2);
     arena
         .arena_competition_enrollment
-        .enroll(Uint128::one(), &coins(1000, DENOM))?;
+        .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
 
     // Trigger expiration
     arena.arena_competition_enrollment.set_sender(&admin);
@@ -541,7 +544,7 @@ fn test_successful_league_creation() -> anyhow::Result<()> {
         arena.arena_competition_enrollment.set_sender(team);
         arena
             .arena_competition_enrollment
-            .enroll(Uint128::one(), &coins(1000, DENOM))?;
+            .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
     }
 
     // Trigger expiration
@@ -624,7 +627,7 @@ fn test_trigger_expiration_without_escrow() -> anyhow::Result<()> {
         arena.arena_competition_enrollment.set_sender(&team);
         arena
             .arena_competition_enrollment
-            .enroll(Uint128::one(), &[])?;
+            .enroll(Uint128::one(), None, &[])?;
     }
 
     // Trigger expiration
@@ -714,7 +717,7 @@ fn test_trigger_expiration_before_min_members() -> anyhow::Result<()> {
         arena.arena_competition_enrollment.set_sender(&team);
         arena
             .arena_competition_enrollment
-            .enroll(Uint128::one(), &coins(1000, DENOM))?;
+            .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
     }
 
     // Trigger expiration
@@ -798,7 +801,7 @@ fn test_unregistered_competition_enrollment() -> anyhow::Result<()> {
         arena.arena_competition_enrollment.set_sender(&team);
         arena
             .arena_competition_enrollment
-            .enroll(Uint128::one(), &coins(1000, DENOM))?;
+            .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
     }
 
     // Trigger expiration
@@ -901,7 +904,7 @@ fn test_huge_tournament() -> anyhow::Result<()> {
         arena.arena_competition_enrollment.set_sender(team);
         arena
             .arena_competition_enrollment
-            .enroll(Uint128::one(), &coins(1000, DENOM))?;
+            .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
     }
 
     // Trigger expiration

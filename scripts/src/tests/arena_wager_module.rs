@@ -232,6 +232,71 @@ fn test_process_wager() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_escrow_receive_extra() -> anyhow::Result<()> {
+    let mock = MockBech32::new(PREFIX);
+    let (mut arena, admin) = setup_arena(&mock)?;
+
+    let user1 = mock.addr_make_with_balance("user1", coins(10000, DENOM))?;
+    let user2 = mock.addr_make_with_balance("user2", coins(10000, DENOM))?;
+
+    arena.arena_wager_module.set_sender(&admin);
+
+    // Create a wager
+    let res = arena.arena_wager_module.create_competition(
+        "A test wager".to_string(),
+        Expiration::AtHeight(1000000),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Test Wager".to_string(),
+        None,
+        Some(Uint128::one()),
+        Some(EscrowInstantiateInfo {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg { dues: vec![] })?,
+            label: "Wager Escrow".to_string(),
+            additional_layered_fees: None,
+        }),
+        None,
+        Some(vec!["Wager Rule".to_string()]),
+        None,
+    )?;
+
+    let escrow_addr = res
+        .events
+        .iter()
+        .find_map(|event| {
+            event
+                .attributes
+                .iter()
+                .find(|attr| attr.key == "escrow_addr")
+                .map(|attr| attr.value.clone())
+        })
+        .unwrap();
+
+    arena
+        .arena_escrow
+        .set_address(&Addr::unchecked(escrow_addr));
+
+    arena.arena_escrow.set_sender(&user1);
+    arena.arena_escrow.receive_native(&coins(1000, DENOM))?;
+
+    let balances = arena.arena_escrow.balances(None, None)?;
+    assert!(balances.len() == 1);
+
+    Ok(())
+}
+
+#[test]
 fn test_wager_with_additional_fees() -> anyhow::Result<()> {
     let mock = MockBech32::new(PREFIX);
     let (mut arena, admin) = setup_arena(&mock)?;

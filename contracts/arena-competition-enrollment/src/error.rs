@@ -62,4 +62,7 @@ pub enum ContractError {
 
     #[error("Only teams of size {required_team_size} can enroll")]
     TeamSizeMismatch { required_team_size: u32 },
+
+    #[error("Cannot enroll a team you are not a member of")]
+    NotTeamMember {},
 }
