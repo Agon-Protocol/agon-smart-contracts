@@ -82,6 +82,14 @@
                     "type": "null"
                   }
                 ]
+              },
+              "require_team_size": {
+                "type": [
+                  "integer",
+                  "null"
+                ],
+                "format": "uint32",
+                "minimum": 0.0
               }
             },
             "additionalProperties": false
@@ -1163,6 +1171,14 @@
                 "type": "null"
               }
             ]
+          },
+          "require_team_size": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "uint32",
+            "minimum": 0.0
           }
         },
         "additionalProperties": false
@@ -1349,6 +1365,14 @@
               "type": "null"
             }
           ]
+        },
+        "require_team_size": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false,
@@ -1950,6 +1974,14 @@
                   "type": "null"
                 }
               ]
+            },
+            "require_team_size": {
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint32",
+              "minimum": 0.0
             }
           },
           "additionalProperties": false

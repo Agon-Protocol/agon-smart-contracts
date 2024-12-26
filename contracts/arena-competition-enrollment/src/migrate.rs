@@ -57,6 +57,7 @@ pub fn from_v2_to_v2_1(deps: DepsMut, env: &Env, group_id: u64) -> StdResult<Vec
             category_id: enrollment.category_id,
             competition_module: enrollment.competition_module,
             group_contract,
+            required_team_size: None,
         };
 
         enrollment_entries().replace(

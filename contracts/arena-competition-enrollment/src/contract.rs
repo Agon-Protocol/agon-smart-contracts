@@ -59,6 +59,7 @@ pub fn execute(
             competition_info,
             competition_type,
             group_contract_info,
+            require_team_size,
         } => execute::create_enrollment(
             deps,
             env,
@@ -71,6 +72,7 @@ pub fn execute(
             competition_info,
             competition_type,
             group_contract_info,
+            require_team_size,
         ),
         ExecuteMsg::TriggerExpiration { id, escrow_id } => {
             execute::trigger_expiration(deps, env, info, id, escrow_id)

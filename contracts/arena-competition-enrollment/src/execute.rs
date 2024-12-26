@@ -26,6 +26,8 @@ use crate::{
 };
 
 pub const TRIGGER_COMPETITION_REPLY_ID: u64 = 1;
+/// Team size is limited to cw4-group's max size limit
+const TEAM_SIZE_LIMIT: u32 = 30;
 
 #[allow(clippy::too_many_arguments)]
 pub fn create_enrollment(
@@ -40,6 +42,7 @@ pub fn create_enrollment(
     competition_info: CompetitionInfoMsg,
     competition_type: CompetitionType,
     group_contract_info: ModuleInstantiateInfo,
+    require_team_size: Option<u32>,
 ) -> Result<Response, ContractError> {
     ensure!(
         !expiration.is_expired(&env.block),
@@ -186,6 +189,7 @@ pub fn create_enrollment(
             category_id,
             competition_module,
             group_contract,
+            required_team_size: require_team_size,
         },
     )?;
 
@@ -423,6 +427,30 @@ pub fn enroll(
         member_count < entry.max_members,
         ContractError::EnrollmentMaxMembers {}
     );
+
+    // Ensure team size requirement is handled
+    if let Some(required_team_size) = entry.required_team_size {
+        let dao_voting_module: Addr = deps.querier.query_wasm_smart(
+            info.sender.to_string(),
+            &dao_interface::msg::QueryMsg::VotingModule {},
+        )?;
+        let group_contract: Addr = deps.querier.query_wasm_smart(
+            dao_voting_module,
+            &dao_voting_cw4::msg::QueryMsg::GroupContract {},
+        )?;
+        let member_list_response: cw4::MemberListResponse = deps.querier.query_wasm_smart(
+            group_contract,
+            &cw4::Cw4QueryMsg::ListMembers {
+                start_after: None,
+                limit: Some(TEAM_SIZE_LIMIT),
+            },
+        )?;
+
+        ensure!(
+            member_list_response.members.len() as u32 == required_team_size,
+            ContractError::TeamSizeMismatch { required_team_size }
+        );
+    }
 
     let msg = CosmosMsg::Wasm(WasmMsg::Execute {
         contract_addr: entry.group_contract.to_string(),

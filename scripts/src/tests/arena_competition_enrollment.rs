@@ -76,6 +76,7 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     let res = arena
@@ -195,6 +196,7 @@ fn test_invalid_enrollment() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     let result = arena
@@ -263,6 +265,7 @@ fn test_enrollment_capacity() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     arena
@@ -345,6 +348,7 @@ fn test_successful_tournament_creation() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     arena
@@ -428,6 +432,7 @@ fn test_successful_wager_creation() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     arena
@@ -524,6 +529,7 @@ fn test_successful_league_creation() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     arena
@@ -603,6 +609,7 @@ fn test_trigger_expiration_without_escrow() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     arena
@@ -692,6 +699,7 @@ fn test_trigger_expiration_before_min_members() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     arena
@@ -775,6 +783,7 @@ fn test_unregistered_competition_enrollment() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     arena
@@ -880,6 +889,7 @@ fn test_huge_tournament() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
+        require_team_size: None,
     };
 
     arena

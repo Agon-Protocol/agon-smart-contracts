@@ -28,6 +28,7 @@ pub enum ExecuteMsg {
         competition_info: CompetitionInfoMsg,
         competition_type: CompetitionType,
         group_contract_info: ModuleInstantiateInfo,
+        require_team_size: Option<u32>,
     },
     TriggerExpiration {
         id: Uint128,

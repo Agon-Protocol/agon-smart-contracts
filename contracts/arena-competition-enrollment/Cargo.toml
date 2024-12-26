@@ -34,3 +34,5 @@ cw-ownable = { workspace = true }
 cw-orch = { workspace = true }
 cw-balance = { workspace = true }
 itertools = { workspace = true }
+dao-voting-cw4 = { workspace = true }
+cw4 = { workspace = true }

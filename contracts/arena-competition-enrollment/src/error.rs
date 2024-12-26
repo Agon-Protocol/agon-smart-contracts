@@ -59,4 +59,7 @@ pub enum ContractError {
 
     #[error("Enrollment is at max members already")]
     EnrollmentMaxMembers {},
+
+    #[error("Only teams of size {required_team_size} can enroll")]
+    TeamSizeMismatch { required_team_size: u32 },
 }

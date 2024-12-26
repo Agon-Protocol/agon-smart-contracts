@@ -20,6 +20,7 @@ pub struct EnrollmentEntry {
     pub category_id: Option<Uint128>,
     pub competition_module: Addr,
     pub group_contract: Addr,
+    pub required_team_size: Option<u32>,
 }
 
 #[cw_serde]
@@ -52,6 +53,7 @@ pub struct EnrollmentEntryResponse {
     pub is_expired: bool,
     pub competition_module: Addr,
     pub group_contract: Addr,
+    pub require_team_size: Option<u32>,
 }
 
 #[cw_serde]
@@ -96,6 +98,7 @@ impl EnrollmentEntry {
             is_expired,
             competition_module: self.competition_module,
             group_contract: self.group_contract,
+            require_team_size: self.required_team_size,
         })
     }
 }
