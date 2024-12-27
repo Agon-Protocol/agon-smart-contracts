@@ -24,20 +24,6 @@ pub struct EnrollmentEntry {
 }
 
 #[cw_serde]
-pub struct EnrollmentEntryV2 {
-    pub min_members: Option<Uint64>,
-    pub max_members: Uint64,
-    pub entry_fee: Option<Coin>,
-    pub expiration: Expiration,
-    pub has_triggered_expiration: bool,
-    pub competition_info: CompetitionInfo,
-    pub competition_type: CompetitionType,
-    pub host: Addr,
-    pub category_id: Option<Uint128>,
-    pub competition_module: Addr,
-}
-
-#[cw_serde]
 pub struct EnrollmentEntryResponse {
     pub category_id: Option<Uint128>,
     pub id: Uint128,
@@ -221,35 +207,6 @@ pub fn enrollment_entries<'a>() -> IndexedMap<'a, u128, EnrollmentEntry, Enrollm
         ),
         host: MultiIndex::new(
             |_x, d: &EnrollmentEntry| d.host.to_string(),
-            "enrollment_entries",
-            "enrollment_entries__host",
-        ),
-    };
-    IndexedMap::new("enrollment_entries", indexes)
-}
-
-pub struct EnrollmentEntryV2Indexes<'a> {
-    pub category: MultiIndex<'a, u128, EnrollmentEntryV2, u128>,
-    pub host: MultiIndex<'a, String, EnrollmentEntryV2, u128>,
-}
-
-impl IndexList<EnrollmentEntryV2> for EnrollmentEntryV2Indexes<'_> {
-    fn get_indexes(&'_ self) -> Box<dyn Iterator<Item = &'_ dyn Index<EnrollmentEntryV2>> + '_> {
-        let v: Vec<&dyn Index<EnrollmentEntryV2>> = vec![&self.host, &self.category];
-        Box::new(v.into_iter())
-    }
-}
-
-pub fn enrollment_entriesv2<'a>(
-) -> IndexedMap<'a, u128, EnrollmentEntryV2, EnrollmentEntryV2Indexes<'a>> {
-    let indexes = EnrollmentEntryV2Indexes {
-        category: MultiIndex::new(
-            |_x, d: &EnrollmentEntryV2| d.category_id.unwrap_or(Uint128::zero()).u128(),
-            "enrollment_entries",
-            "enrollment_entries__category",
-        ),
-        host: MultiIndex::new(
-            |_x, d: &EnrollmentEntryV2| d.host.to_string(),
             "enrollment_entries",
             "enrollment_entries__host",
         ),

@@ -27,7 +27,6 @@ pub type CompetitionModule<'a> = CompetitionModuleContract<
     ExecuteExt,
     LeagueQueryExt,
     LeagueExt,
-    LeagueExt,
     LeagueInstantiateExt,
 >;
 
@@ -165,18 +164,11 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(mut deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     let competition_module = CompetitionModule::default();
     let version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     match msg {
-        MigrateMsg::WithGroupAddress { group_contract } => {
-            let group_contract = deps.api.addr_validate(&group_contract)?;
-
-            if version.major == 2 && version.minor <= 1 {
-                competition_module.migrate_from_v2_to_v2_1(deps.branch(), env, group_contract)?
-            }
-        }
         MigrateMsg::FromCompatible {} => {
             if version.major == 1 && version.minor == 3 {
                 migrate::from_v1_3_to_v_1_4(deps.branch())?;

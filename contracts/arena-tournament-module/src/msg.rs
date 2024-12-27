@@ -55,7 +55,6 @@ pub struct MatchResultMsg {
 #[cw_serde]
 pub enum MigrateMsg {
     FromCompatible {},
-    WithGroupAddress { group_contract: String },
 }
 
 /// This is used to completely generate schema types

@@ -9,19 +9,16 @@ use arena_interface::core::QueryExtFns;
 use arena_interface::escrow::{ExecuteMsgFns as _, QueryMsgFns as _};
 use arena_interface::group::{self, GroupContractInfo};
 use arena_interface::registry::ExecuteMsgFns as _;
-use arena_wager_module::msg::{MigrateMsg, WagerInstantiateExt};
+use arena_wager_module::msg::WagerInstantiateExt;
 use cosmwasm_std::{coins, to_json_binary, Addr, Coin, Decimal, Uint128};
 use cw_balance::{
     BalanceUnchecked, BalanceVerified, Distribution, MemberBalanceUnchecked, MemberPercentage,
 };
 use cw_orch::{anyhow, prelude::*};
-use cw_orch_clone_testing::CloneTesting;
 use cw_utils::Expiration;
 use dao_interface::state::ModuleInstantiateInfo;
 use dao_interface::CoreQueryMsgFns;
-use networks::PION_1;
 
-use crate::arena::Arena;
 use crate::tests::helpers::{setup_arena, setup_voting_module, teams_to_members};
 
 use super::{DENOM, PREFIX};
@@ -1458,38 +1455,6 @@ fn test_wager_with_aggregate_stats() -> anyhow::Result<()> {
         StatValue::Decimal(Decimal::percent(20)),
     );
     mock.next_block()?;
-
-    Ok(())
-}
-
-#[test]
-#[ignore = "RPC blocks"]
-fn test_migration_v2_v2_1() -> anyhow::Result<()> {
-    let app = CloneTesting::new(PION_1)?;
-    let mut arena = Arena::new(app.clone());
-    const ARENA_DAO: &str = "neutron1ehkcl0n6s2jtdw75xsvfxm304mz4hs5z7jt6wn5mk0celpj0epqql4ulxk";
-    let arena_dao_addr = Addr::unchecked(ARENA_DAO);
-
-    arena.arena_group.upload()?;
-    arena.arena_wager_module.upload()?;
-
-    arena.arena_group.instantiate(
-        &group::InstantiateMsg { members: None },
-        Some(&arena_dao_addr),
-        None,
-    )?;
-
-    arena.arena_wager_module.set_address(&Addr::unchecked(
-        "neutron16nl0tcwt9qujavdakft7ddyw4pwzh5nuzn35tke9m4yfu462z99q6yj66n",
-    ));
-    arena.arena_wager_module.set_sender(&arena_dao_addr);
-
-    arena.arena_wager_module.migrate(
-        &MigrateMsg::WithGroupAddress {
-            group_contract: arena.arena_group.addr_str()?,
-        },
-        arena.arena_wager_module.code_id()?,
-    )?;
 
     Ok(())
 }

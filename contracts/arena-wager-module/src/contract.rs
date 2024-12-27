@@ -15,20 +15,13 @@ use cw_competition_base::{contract::CompetitionModuleContract, error::Competitio
 
 use crate::msg::{
     ExecuteExt, ExecuteMsg, InstantiateMsg, MigrateMsg, QueryExt, QueryMsg, Wager, WagerExt,
-    WagerInstantiateExt, WagerV2Ext,
+    WagerInstantiateExt,
 };
 
 pub(crate) const CONTRACT_NAME: &str = "crates.io:arena-wager-module";
 pub(crate) const CONTRACT_VERSION: &str = env!("CARGO_PKG_VERSION");
-pub type CompetitionModule<'a> = CompetitionModuleContract<
-    'a,
-    Empty,
-    ExecuteExt,
-    QueryExt,
-    WagerExt,
-    WagerV2Ext,
-    WagerInstantiateExt,
->;
+pub type CompetitionModule<'a> =
+    CompetitionModuleContract<'a, Empty, ExecuteExt, QueryExt, WagerExt, WagerInstantiateExt>;
 
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn instantiate(
@@ -170,18 +163,15 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, CompetitionError> {
+pub fn migrate(
+    mut deps: DepsMut,
+    _env: Env,
+    msg: MigrateMsg,
+) -> Result<Response, CompetitionError> {
     let competition_module = CompetitionModule::default();
     let version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     match msg {
-        MigrateMsg::WithGroupAddress { group_contract } => {
-            let group_contract = deps.api.addr_validate(&group_contract)?;
-
-            if version.major == 2 && version.minor <= 1 {
-                competition_module.migrate_from_v2_to_v2_1(deps.branch(), env, group_contract)?
-            }
-        }
         MigrateMsg::FromCompatible {} => {
             if version.major == 1 && version.minor < 7 {
                 competition_module.migrate_from_v1_6_to_v1_7(deps.branch())?;
