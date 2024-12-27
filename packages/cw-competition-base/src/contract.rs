@@ -1056,7 +1056,7 @@ impl<
             .prefix(competition.id.u128())
             .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
             .collect::<StdResult<_>>()?;
-        let msg_binary = to_json_binary(&ExecuteBase::<Empty, Empty>::ExecuteCompetitionHook {
+        let msg_binary = to_json_binary(&ExecuteBase::ExecuteCompetitionHook::<Empty, Empty> {
             competition_id: competition.id,
             distribution: distribution_msg.clone(),
         })?;
@@ -1676,7 +1676,7 @@ impl<
         }
         Ok(deps.querier.query_wasm_smart(
             core.owner.unwrap(),
-            &dao_pre_propose_base::msg::QueryMsg::<Empty>::Dao {},
+            &dao_pre_propose_base::msg::QueryMsg::Dao::<Empty> {},
         )?)
     }
 

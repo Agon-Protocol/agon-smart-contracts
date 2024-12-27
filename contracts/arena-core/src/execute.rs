@@ -241,31 +241,29 @@ pub fn propose(
         )?;
 
     // Construct message
-    let msg =
-        ProposeMessages::Propose(SingleChoiceProposeMsg {
-            title: msg.title,
-            description: msg.description,
-            vote: if voting_power.power.is_zero() {
-                None
-            } else {
-                Some(SingleChoiceAutoVote {
-                    vote: Vote::Yes,
-                    rationale: None,
-                })
-            },
-            msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
-                contract_addr: info.sender.to_string(),
-                msg: to_json_binary(&arena_interface::competition::msg::ExecuteBase::<
-                    Empty,
-                    Empty,
-                >::ProcessCompetition {
+    let msg = ProposeMessages::Propose(SingleChoiceProposeMsg {
+        title: msg.title,
+        description: msg.description,
+        vote: if voting_power.power.is_zero() {
+            None
+        } else {
+            Some(SingleChoiceAutoVote {
+                vote: Vote::Yes,
+                rationale: None,
+            })
+        },
+        msgs: vec![CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: info.sender.to_string(),
+            msg: to_json_binary(
+                &arena_interface::competition::msg::ExecuteBase::ProcessCompetition::<Empty, Empty> {
                     competition_id: msg.competition_id,
                     distribution: msg.distribution,
-                })?,
-                funds: vec![],
-            })],
-            proposer: Some(originator.to_string()),
-        });
+                },
+            )?,
+            funds: vec![],
+        })],
+        proposer: Some(originator.to_string()),
+    });
 
     let propose_message = WasmMsg::Execute {
         contract_addr: proposal_module.into_string(),
