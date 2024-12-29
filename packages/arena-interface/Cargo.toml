@@ -27,4 +27,3 @@ cw-address-like = { workspace = true }
 cw-orch = { workspace = true }
 cw-ownable = { workspace = true }
 cw20 = { workspace = true }
-cw721 = { workspace = true }

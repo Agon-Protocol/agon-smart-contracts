@@ -23,7 +23,6 @@ cw-balance = { workspace = true }
 dao-cw-orch = { workspace = true }
 itertools = { workspace = true }
 arena-competition-enrollment = { workspace = true }
-arena-token-gateway = { workspace = true }
 arena-payment-registry = { workspace = true }
 cosmwasm-schema = { workspace = true }
 serde_json = { workspace = true }

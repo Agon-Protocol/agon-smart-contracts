@@ -13,7 +13,7 @@ impl IndexList<Uint64> for MemberIndexes<'_> {
 }
 
 pub const MEMBER_COUNT: Item<Uint64> = Item::new("member_count");
-pub fn members<'a>() -> IndexedMap<'a, &'a Addr, Uint64, MemberIndexes<'a>> {
+pub fn members<'a>() -> IndexedMap<&'a Addr, Uint64, MemberIndexes<'a>> {
     let indexes = MemberIndexes {
         seed: MultiIndex::new(|_, d| d.u64(), "members", "members__seed"),
     };

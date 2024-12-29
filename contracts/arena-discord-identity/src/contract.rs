@@ -105,12 +105,8 @@ pub fn execute(
 
             Ok(Response::new().add_attribute("action", "remove_profile"))
         }
-        ExecuteMsg::Withdraw {} => {
+        ExecuteMsg::Withdraw { funds } => {
             assert_owner(deps.storage, &info.sender)?;
-
-            let funds = deps
-                .querier
-                .query_all_balances(env.contract.address.to_string())?;
 
             Ok(Response::new()
                 .add_attribute("action", "withdraw")

@@ -11,7 +11,7 @@ pub struct FeeInformation<T: AddressLike> {
 }
 
 impl FeeInformation<String> {
-    pub fn into_checked(&self, deps: Deps) -> StdResult<FeeInformation<Addr>> {
+    pub fn into_checked(self, deps: Deps) -> StdResult<FeeInformation<Addr>> {
         ensure!(
             self.tax < Decimal::one(),
             StdError::generic_err("Tax must be less than 100%")
@@ -20,8 +20,8 @@ impl FeeInformation<String> {
         Ok(FeeInformation {
             receiver: deps.api.addr_validate(&self.receiver)?,
             tax: self.tax,
-            cw20_msg: self.cw20_msg.clone(),
-            cw721_msg: self.cw721_msg.clone(),
+            cw20_msg: self.cw20_msg,
+            cw721_msg: self.cw721_msg,
         })
     }
 }

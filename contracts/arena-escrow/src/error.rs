@@ -1,4 +1,6 @@
-use cosmwasm_std::{CheckedFromRatioError, CheckedMultiplyFractionError, OverflowError, StdError};
+use cosmwasm_std::{
+    Addr, CheckedFromRatioError, CheckedMultiplyFractionError, OverflowError, StdError,
+};
 use cw_balance::BalanceError;
 use cw_ownable::OwnershipError;
 use thiserror::Error;
@@ -38,9 +40,12 @@ pub enum ContractError {
     #[error("Cannot provide an empty balance")]
     EmptyBalance {},
 
-    #[error("Already distributed")]
-    AlreadyDistributed {},
-
     #[error("Unauthorized")]
     Unauthorized {},
+
+    #[error("Cannot have duplicate dues of a member: {address}")]
+    DuplicateDues { address: Addr },
+
+    #[error("Nothing to withdraw")]
+    NothingToWithdraw {},
 }

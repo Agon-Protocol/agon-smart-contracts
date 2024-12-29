@@ -11,7 +11,7 @@ pub struct MemberPercentage<T: AddressLike> {
 }
 
 impl MemberPercentage<String> {
-    pub fn into_checked(&self, deps: Deps) -> StdResult<MemberPercentage<Addr>> {
+    pub fn into_checked(self, deps: Deps) -> StdResult<MemberPercentage<Addr>> {
         Ok(MemberPercentage {
             addr: deps.api.addr_validate(&self.addr)?,
             percentage: self.percentage,
@@ -26,7 +26,7 @@ pub struct Distribution<T: AddressLike> {
 }
 
 impl Distribution<String> {
-    pub fn into_checked(&self, deps: Deps) -> StdResult<Distribution<Addr>> {
+    pub fn into_checked(self, deps: Deps) -> StdResult<Distribution<Addr>> {
         if self.member_percentages.is_empty() {
             return Err(StdError::generic_err("Member percentages cannot be empty"));
         }
@@ -52,7 +52,7 @@ impl Distribution<String> {
         Ok(Distribution::<Addr> {
             member_percentages: self
                 .member_percentages
-                .iter()
+                .into_iter()
                 .map(|x| x.into_checked(deps))
                 .collect::<StdResult<_>>()?,
             remainder_addr: deps.api.addr_validate(&self.remainder_addr)?,

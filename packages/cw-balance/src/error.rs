@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    CheckedFromRatioError, CheckedMultiplyFractionError, DecimalRangeExceeded, OverflowError,
-    StdError,
+    CheckedFromRatioError, CheckedMultiplyFractionError, CoinsError, DecimalRangeExceeded,
+    OverflowError, StdError,
 };
 use thiserror::Error;
 
@@ -11,6 +11,9 @@ pub enum BalanceError {
 
     #[error("{0}")]
     CheckedFromRatioError(#[from] CheckedFromRatioError),
+
+    #[error("{0}")]
+    CoinsError(#[from] CoinsError),
 
     #[error("{0}")]
     CheckedMultiplyFractionError(#[from] CheckedMultiplyFractionError),

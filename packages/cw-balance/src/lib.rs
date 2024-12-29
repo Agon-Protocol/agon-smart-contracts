@@ -1,10 +1,13 @@
+mod assets;
 mod balance;
+mod cw20_coins;
 mod cw721;
 mod distribution;
 mod error;
 mod member_balance;
 mod util;
 
+pub use assets::*;
 pub use balance::{BalanceUnchecked, BalanceVerified};
 pub use cw721::{Cw721Collection, Cw721CollectionVerified};
 pub use distribution::{Distribution, MemberPercentage};

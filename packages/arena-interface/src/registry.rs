@@ -1,4 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
+use cosmwasm_std::Addr;
 use cw_balance::{Distribution, MemberPercentage};
 
 #[cw_serde]
@@ -19,8 +20,13 @@ pub enum ExecuteMsg {
 #[cw_serde]
 #[derive(QueryResponses, cw_orch::QueryFns)]
 pub enum QueryMsg {
-    #[returns(Option<Distribution<String>>)]
+    #[returns(Option<Distribution<Addr>>)]
     GetDistribution { addr: String, height: Option<u64> },
+    #[returns(Vec<(Addr, Distribution<Addr>)>)]
+    GetDistributions {
+        addrs: Vec<String>,
+        height: Option<u64>,
+    },
 }
 
 #[cw_serde]

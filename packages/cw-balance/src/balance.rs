@@ -8,7 +8,6 @@ use cosmwasm_std::{
     WasmMsg,
 };
 use cw20::{Cw20Coin, Cw20CoinVerified, Cw20ExecuteMsg};
-use cw721::Cw721ExecuteMsg;
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
@@ -347,10 +346,9 @@ impl BalanceVerified {
         deps: Deps,
         recipient: &Addr,
         cw20_msg: Option<Binary>,
-        cw721_msg: Option<Binary>,
     ) -> StdResult<Vec<CosmosMsg>> {
         if is_contract(deps, recipient.to_string()) {
-            self.send_all(recipient, cw20_msg, cw721_msg)
+            self.send_all(recipient, cw20_msg)
         } else {
             self.transfer_all(recipient)
         }
@@ -360,7 +358,6 @@ impl BalanceVerified {
         &self,
         contract_addr: &Addr,
         cw20_msg: Option<Binary>,
-        cw721_msg: Option<Binary>,
     ) -> StdResult<Vec<CosmosMsg>> {
         let mut messages = Vec::new();
 
@@ -379,23 +376,6 @@ impl BalanceVerified {
                     })?,
                     funds: vec![],
                 }));
-            }
-        }
-
-        // Send CW721 tokens
-        if let Some(cw721) = &self.cw721 {
-            for collection in cw721 {
-                for token_id in &collection.token_ids {
-                    messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                        contract_addr: collection.address.to_string(),
-                        msg: to_json_binary(&Cw721ExecuteMsg::SendNft {
-                            contract: contract_addr.to_string(),
-                            token_id: token_id.clone(),
-                            msg: cw721_msg.clone().unwrap_or_default(),
-                        })?,
-                        funds: vec![],
-                    }));
-                }
             }
         }
 
@@ -419,22 +399,6 @@ impl BalanceVerified {
                     })?,
                     funds: vec![],
                 }));
-            }
-        }
-
-        // Transfer CW721 tokens
-        if let Some(cw721) = &self.cw721 {
-            for collection in cw721 {
-                for token_id in &collection.token_ids {
-                    messages.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                        contract_addr: collection.address.to_string(),
-                        msg: to_json_binary(&Cw721ExecuteMsg::TransferNft {
-                            recipient: recipient.to_string(),
-                            token_id: token_id.clone(),
-                        })?,
-                        funds: vec![],
-                    }));
-                }
             }
         }
 

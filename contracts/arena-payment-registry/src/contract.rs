@@ -46,6 +46,9 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
         QueryMsg::GetDistribution { addr, height } => {
             to_json_binary(&query::get_distribution(deps, env, addr, height)?)
         }
+        QueryMsg::GetDistributions { addrs, height } => {
+            to_json_binary(&query::get_distributions(deps, env, addrs, height)?)
+        }
     }
 }
 

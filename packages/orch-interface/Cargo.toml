@@ -24,7 +24,6 @@ arena-competition-enrollment = { workspace = true }
 arena-core = { workspace = true }
 arena-interface = { workspace = true }
 arena-escrow = { workspace = true }
-arena-token-gateway = { workspace = true }
 arena-payment-registry = { workspace = true }
 arena-discord-identity = { workspace = true }
 cosmwasm-std = { workspace = true }

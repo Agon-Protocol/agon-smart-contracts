@@ -1,6 +1,6 @@
 use crate::{
     execute, migrate, query,
-    state::{self, DUE, INITIAL_DUE, IS_LOCKED},
+    state::{self, DUES, INITIAL_DUES, IS_LOCKED},
     ContractError,
 };
 use arena_interface::escrow::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
@@ -8,7 +8,7 @@ use cosmwasm_std::{
     entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Response, StdResult,
 };
 use cw2::{ensure_from_older_version, set_contract_version};
-use cw_balance::MemberBalanceUnchecked;
+use cw_balance::MemberAssetsUnchecked;
 
 // version info for migration info
 pub(crate) const CONTRACT_NAME: &str = "crates.io:arena-escrow";
@@ -30,24 +30,22 @@ pub fn instantiate(
 pub fn instantiate_contract(
     deps: DepsMut,
     info: &MessageInfo,
-    dues: Vec<MemberBalanceUnchecked>,
+    dues: Vec<MemberAssetsUnchecked>,
 ) -> Result<(), ContractError> {
     cw_ownable::initialize_owner(deps.storage, deps.api, Some(info.sender.as_str()))?;
 
     IS_LOCKED.save(deps.storage, &false)?;
-    for member_balance in dues {
-        let member_balance = member_balance.into_checked(deps.as_ref())?;
+    for member_asset in dues {
+        let member_asset = member_asset.into_checked(deps.as_ref())?;
 
-        if INITIAL_DUE.has(deps.storage, &member_balance.addr) {
-            return Err(ContractError::StdError(
-                cosmwasm_std::StdError::GenericErr {
-                    msg: "Cannot have duplicate addresses in dues".to_string(),
-                },
-            ));
+        if INITIAL_DUES.has(deps.storage, &member_asset.addr) {
+            return Err(ContractError::DuplicateDues {
+                address: member_asset.addr,
+            });
         }
 
-        INITIAL_DUE.save(deps.storage, &member_balance.addr, &member_balance.balance)?;
-        DUE.save(deps.storage, &member_balance.addr, &member_balance.balance)?;
+        INITIAL_DUES.save(deps.storage, &member_asset.addr, &member_asset.assets)?;
+        DUES.save(deps.storage, &member_asset.addr, &member_asset.assets)?;
     }
 
     Ok(())
@@ -69,9 +67,6 @@ pub fn execute(
         ExecuteMsg::Receive(cw20_receive_msg) => {
             execute::receive_cw20(deps, info, cw20_receive_msg)
         }
-        ExecuteMsg::ReceiveNft(cw721_receive_msg) => {
-            execute::receive_cw721(deps, info, cw721_receive_msg)
-        }
         ExecuteMsg::Distribute {
             distribution,
             layered_fees,
@@ -80,8 +75,8 @@ pub fn execute(
         } => execute::distribute(
             deps,
             info,
-            distribution,
             layered_fees,
+            distribution,
             activation_height,
             group_contract,
         ),
@@ -96,7 +91,10 @@ pub fn execute(
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
-        QueryMsg::Balance { addr } => to_json_binary(&query::balance(deps, addr)?),
+        QueryMsg::Balance { addr } => {
+            let addr = deps.api.addr_validate(&addr)?;
+            to_json_binary(&query::balance(deps, &addr)?)
+        }
         QueryMsg::Due { addr } => to_json_binary(&query::due(deps, addr)?),
         QueryMsg::TotalBalance {} => to_json_binary(&query::total_balance(deps)?),
         QueryMsg::IsLocked {} => to_json_binary(&query::is_locked(deps)),

@@ -22,7 +22,9 @@ pub enum ExecuteMsg {
         amount: Coin,
     },
     RemoveProfile {},
-    Withdraw {},
+    Withdraw {
+        funds: Vec<Coin>,
+    },
 }
 
 #[cw_ownable::cw_ownable_query]
