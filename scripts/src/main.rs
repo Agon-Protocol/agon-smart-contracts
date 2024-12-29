@@ -1,4 +1,3 @@
-use arena::Arena;
 use cw_orch::{anyhow, prelude::*};
 use orch_interface::{
     arena_competition_enrollment::ArenaCompetitionEnrollmentContract,
@@ -22,7 +21,11 @@ fn main() -> anyhow::Result<()> {
 
     match command {
         Command::Deploy(network, component) => deploy(network, component)?,
-        Command::Unknown => println!("Unknown command. Use 'deploy <network> <component>'."),
+        Command::Unknown => {
+            println!(
+                "Usage: deploy <network: testnet|mainnet|all> <component: all|core|dao_core|...>"
+            );
+        }
     }
 
     Ok(())
@@ -38,6 +41,7 @@ enum Command {
 enum Network {
     Testnet,
     Mainnet,
+    All,
 }
 
 #[derive(Debug)]
@@ -55,129 +59,146 @@ enum DeployComponent {
     Escrow,
 }
 
+impl Network {
+    fn parse(input: &str) -> Option<Self> {
+        match input {
+            "testnet" => Some(Self::Testnet),
+            "mainnet" => Some(Self::Mainnet),
+            "all" => Some(Self::All),
+            _ => None,
+        }
+    }
+}
+
+impl DeployComponent {
+    fn parse(input: &str) -> Option<Self> {
+        match input {
+            "all" => Some(Self::All),
+            "core" => Some(Self::Core),
+            "dao_core" => Some(Self::DaoCore),
+            "tournament" => Some(Self::Tournament),
+            "enrollment" => Some(Self::Enrollment),
+            "token_gateway" => Some(Self::TokenGateway),
+            "competition_modules" => Some(Self::CompetitionModules),
+            "group" => Some(Self::Group),
+            "identity" => Some(Self::Identity),
+            "registry" => Some(Self::Registry),
+            "escrow" => Some(Self::Escrow),
+            _ => None,
+        }
+    }
+}
+
 fn parse_command(args: &[String]) -> Command {
     if args.len() < 4 || args[1] != "deploy" {
         return Command::Unknown;
     }
 
-    let network = match args[2].as_str() {
-        "testnet" => Network::Testnet,
-        "mainnet" => Network::Mainnet,
-        _ => return Command::Unknown,
-    };
+    let network = Network::parse(&args[2]);
+    let component = DeployComponent::parse(&args[3]);
 
-    let component = match args[3].as_str() {
-        "all" => DeployComponent::All,
-        "core" => DeployComponent::Core,
-        "dao_core" => DeployComponent::DaoCore,
-        "tournament" => DeployComponent::Tournament,
-        "enrollment" => DeployComponent::Enrollment,
-        "token_gateway" => DeployComponent::TokenGateway,
-        "competition_modules" => DeployComponent::CompetitionModules,
-        "group" => DeployComponent::Group,
-        "identity" => DeployComponent::Identity,
-        "registry" => DeployComponent::Registry,
-        "escrow" => DeployComponent::Escrow,
-        _ => return Command::Unknown,
-    };
-
-    Command::Deploy(network, component)
+    match (network, component) {
+        (Some(network), Some(component)) => Command::Deploy(network, component),
+        _ => Command::Unknown,
+    }
 }
 
 fn deploy(network: Network, component: DeployComponent) -> anyhow::Result<()> {
-    let daemon = match network {
-        Network::Testnet => Daemon::builder(cw_orch::daemon::networks::PION_1).build()?,
-        Network::Mainnet => Daemon::builder(cw_orch::daemon::networks::NEUTRON_1).build()?,
-    };
-
-    match component {
-        DeployComponent::All => deploy_all(daemon)?,
-        DeployComponent::Core => deploy_core(daemon)?,
-        DeployComponent::DaoCore => deploy_dao_core(daemon)?,
-        DeployComponent::Tournament => deploy_tournament(daemon)?,
-        DeployComponent::Enrollment => deploy_enrollment(daemon)?,
-        DeployComponent::TokenGateway => deploy_token_gateway(daemon)?,
-        DeployComponent::CompetitionModules => deploy_competition_modules(daemon)?,
-        DeployComponent::Group => deploy_group(daemon)?,
-        DeployComponent::Identity => deploy_identity(daemon)?,
-        DeployComponent::Registry => deploy_registry(daemon)?,
-        DeployComponent::Escrow => deploy_escrow(daemon)?,
+    match network {
+        Network::All => {
+            deploy_to_network(Network::Testnet, &component)?;
+            deploy_to_network(Network::Mainnet, &component)?;
+        }
+        _ => deploy_to_network(network, &component)?,
     }
 
     Ok(())
 }
 
-fn deploy_all(daemon: Daemon) -> anyhow::Result<()> {
-    let arena = Arena::new(daemon);
-    arena.upload(false)?;
+fn deploy_to_network(network: Network, component: &DeployComponent) -> anyhow::Result<()> {
+    let daemon = match network {
+        Network::Testnet => Daemon::builder(cw_orch::daemon::networks::PION_1).build()?,
+        Network::Mainnet => Daemon::builder(cw_orch::daemon::networks::NEUTRON_1).build()?,
+        Network::All => unreachable!("'All' should not reach here."),
+    };
+
+    match component {
+        DeployComponent::All => {
+            deploy_core(&daemon)?;
+            deploy_dao_core(&daemon)?;
+            deploy_tournament(&daemon)?;
+            deploy_enrollment(&daemon)?;
+            deploy_token_gateway(&daemon)?;
+            deploy_competition_modules(&daemon)?;
+            deploy_group(&daemon)?;
+            deploy_identity(&daemon)?;
+            deploy_registry(&daemon)?;
+            deploy_escrow(&daemon)?;
+        }
+        DeployComponent::Core => deploy_core(&daemon)?,
+        DeployComponent::DaoCore => deploy_dao_core(&daemon)?,
+        DeployComponent::Tournament => deploy_tournament(&daemon)?,
+        DeployComponent::Enrollment => deploy_enrollment(&daemon)?,
+        DeployComponent::TokenGateway => deploy_token_gateway(&daemon)?,
+        DeployComponent::CompetitionModules => deploy_competition_modules(&daemon)?,
+        DeployComponent::Group => deploy_group(&daemon)?,
+        DeployComponent::Identity => deploy_identity(&daemon)?,
+        DeployComponent::Registry => deploy_registry(&daemon)?,
+        DeployComponent::Escrow => deploy_escrow(&daemon)?,
+    }
+
     Ok(())
 }
 
-fn deploy_core(daemon: Daemon) -> anyhow::Result<()> {
-    let core = ArenaCoreContract::new(daemon);
-    core.upload()?;
+// Deployment Functions
+fn deploy_core(daemon: &Daemon) -> anyhow::Result<()> {
+    ArenaCoreContract::new(daemon.clone()).upload()?;
     Ok(())
 }
 
-fn deploy_dao_core(daemon: Daemon) -> anyhow::Result<()> {
-    let dao_core = DaoDaoCoreContract::new(daemon);
-    dao_core.upload()?;
+fn deploy_dao_core(daemon: &Daemon) -> anyhow::Result<()> {
+    DaoDaoCoreContract::new(daemon.clone()).upload()?;
     Ok(())
 }
 
-fn deploy_tournament(daemon: Daemon) -> anyhow::Result<()> {
-    let tournament = ArenaTournamentModuleContract::new(daemon);
-    tournament.upload()?;
+fn deploy_tournament(daemon: &Daemon) -> anyhow::Result<()> {
+    ArenaTournamentModuleContract::new(daemon.clone()).upload()?;
     Ok(())
 }
 
-fn deploy_enrollment(daemon: Daemon) -> anyhow::Result<()> {
-    let enrollment = ArenaCompetitionEnrollmentContract::new(daemon);
-    enrollment.upload()?;
+fn deploy_enrollment(daemon: &Daemon) -> anyhow::Result<()> {
+    ArenaCompetitionEnrollmentContract::new(daemon.clone()).upload()?;
     Ok(())
 }
 
-fn deploy_token_gateway(daemon: Daemon) -> anyhow::Result<()> {
-    let token_gateway = ArenaTokenGatewayContract::new(daemon);
-    token_gateway.upload()?;
+fn deploy_token_gateway(daemon: &Daemon) -> anyhow::Result<()> {
+    ArenaTokenGatewayContract::new(daemon.clone()).upload()?;
     Ok(())
 }
 
-fn deploy_competition_modules(daemon: Daemon) -> anyhow::Result<()> {
-    let wager_module = ArenaWagerModuleContract::new(daemon.clone());
-    wager_module.upload()?;
-    let league_module = ArenaLeagueModuleContract::new(daemon.clone());
-    league_module.upload()?;
-    let tournament_module = ArenaTournamentModuleContract::new(daemon);
-    tournament_module.upload()?;
+fn deploy_competition_modules(daemon: &Daemon) -> anyhow::Result<()> {
+    ArenaWagerModuleContract::new(daemon.clone()).upload()?;
+    ArenaLeagueModuleContract::new(daemon.clone()).upload()?;
+    ArenaTournamentModuleContract::new(daemon.clone()).upload()?;
     Ok(())
 }
 
-fn deploy_group(daemon: Daemon) -> anyhow::Result<()> {
-    let group = ArenaGroupContract::new(daemon);
-    group.upload()?;
+fn deploy_group(daemon: &Daemon) -> anyhow::Result<()> {
+    ArenaGroupContract::new(daemon.clone()).upload()?;
     Ok(())
 }
 
-fn deploy_identity(daemon: Daemon) -> anyhow::Result<()> {
-    let identity = ArenaDiscordIdentityContract::new(daemon);
-    identity.upload()?;
+fn deploy_identity(daemon: &Daemon) -> anyhow::Result<()> {
+    ArenaDiscordIdentityContract::new(daemon.clone()).upload()?;
     Ok(())
 }
 
-fn deploy_registry(daemon: Daemon) -> anyhow::Result<()> {
-    let registry = ArenaPaymentRegistryContract::new(daemon);
-    registry.upload()?;
+fn deploy_registry(daemon: &Daemon) -> anyhow::Result<()> {
+    ArenaPaymentRegistryContract::new(daemon.clone()).upload()?;
     Ok(())
 }
 
-fn deploy_escrow(daemon: Daemon) -> anyhow::Result<()> {
-    let escrow = ArenaEscrowContract::new(daemon);
-    escrow.upload()?;
+fn deploy_escrow(daemon: &Daemon) -> anyhow::Result<()> {
+    ArenaEscrowContract::new(daemon.clone()).upload()?;
     Ok(())
 }
-
-mod arena;
-mod dao_dao;
-#[cfg(test)]
-mod tests;

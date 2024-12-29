@@ -123,7 +123,7 @@ pub fn receive_cw20(
 ) -> Result<Response, ContractError> {
     let sender_addr = deps.api.addr_validate(&cw20_receive_msg.sender)?;
     let cw20_balance = vec![Cw20CoinVerified {
-        address: sender_addr.clone(),
+        address: info.sender,
         amount: cw20_receive_msg.amount,
     }];
 
@@ -144,7 +144,7 @@ pub fn receive_cw721(
 ) -> Result<Response, ContractError> {
     let sender_addr = deps.api.addr_validate(&cw721_receive_msg.sender)?;
     let cw721_balance = vec![Cw721CollectionVerified {
-        address: sender_addr.clone(),
+        address: info.sender,
         token_ids: vec![cw721_receive_msg.token_id],
     }];
 
