@@ -40,7 +40,7 @@ fn register_competition_enrollment_module(
     arena
         .dao_dao
         .dao_proposal_sudo
-        .call_as(&admin)
+        .call_as(admin)
         .proposal_execute(vec![CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: arena.arena_core.addr_str()?,
             msg: to_json_binary(&arena_interface::core::ExecuteMsg::Extension {

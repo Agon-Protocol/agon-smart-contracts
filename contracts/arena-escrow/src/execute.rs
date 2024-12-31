@@ -6,14 +6,13 @@ use arena_interface::{
     group,
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, DepsMut, Empty, Env, MessageInfo,
-    Order, Response, StdError, StdResult, Uint128,
+    to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, DepsMut, Empty, MessageInfo, Order,
+    Response, StdError, StdResult, Uint128,
 };
 use cw20::{Cw20CoinVerified, Cw20ReceiveMsg};
 use cw721::Cw721ReceiveMsg;
 use cw_balance::{
     BalanceError, BalanceVerified, Cw721CollectionVerified, Distribution, MemberBalanceChecked,
-    MemberBalanceUnchecked,
 };
 use cw_ownable::{assert_owner, get_ownership};
 
@@ -25,35 +24,6 @@ use crate::{
     },
     ContractError,
 };
-
-pub fn set_dues(
-    deps: DepsMut,
-    env: Env,
-    info: MessageInfo,
-    dues: Vec<MemberBalanceUnchecked>,
-) -> Result<Response, ContractError> {
-    if info.sender != env.contract.address {
-        assert_owner(deps.storage, &info.sender)?;
-    }
-
-    IS_LOCKED.save(deps.storage, &false)?;
-    for member_balance in dues {
-        let member_balance = member_balance.into_checked(deps.as_ref())?;
-
-        if INITIAL_DUE.has(deps.storage, &member_balance.addr) {
-            return Err(ContractError::StdError(
-                cosmwasm_std::StdError::GenericErr {
-                    msg: "Cannot have duplicate addresses in dues".to_string(),
-                },
-            ));
-        }
-
-        INITIAL_DUE.save(deps.storage, &member_balance.addr, &member_balance.balance)?;
-        DUE.save(deps.storage, &member_balance.addr, &member_balance.balance)?;
-    }
-
-    Ok(Response::new().add_attribute("action", "set_dues"))
-}
 
 pub fn withdraw(
     deps: DepsMut,
@@ -389,10 +359,11 @@ pub fn distribute(
     let payment_registry = payment_registry
         .map(|x| deps.api.addr_validate(&x))
         .transpose()?;
-    let mut has_preset_distribution = false;
 
     // Process each distributed amount
     for distributed_amount in distributed_amounts {
+        let mut has_preset_distribution = false;
+
         if let Some(ref payment_registry) = payment_registry {
             // Query preset distribution from payment registry
             let preset_distribution: Option<Distribution<String>> = deps.querier.query_wasm_smart(
@@ -413,13 +384,10 @@ pub fn distribute(
                     BALANCE.update(
                         deps.storage,
                         &new_balance.addr,
-                        |old_balance| -> Result<_, ContractError> {
-                            match old_balance {
-                                Some(old_balance) => {
-                                    Ok(old_balance.checked_add(&new_balance.balance)?)
-                                }
-                                None => Ok(new_balance.balance),
-                            }
+                        |old_balance| -> StdResult<_> {
+                            old_balance
+                                .unwrap_or_default()
+                                .checked_add(&new_balance.balance)
                         },
                     )?;
                 }
@@ -431,13 +399,10 @@ pub fn distribute(
             BALANCE.update(
                 deps.storage,
                 &distributed_amount.addr,
-                |old_balance| -> Result<_, ContractError> {
-                    match old_balance {
-                        Some(old_balance) => {
-                            Ok(old_balance.checked_add(&distributed_amount.balance)?)
-                        }
-                        None => Ok(distributed_amount.balance),
-                    }
+                |old_balance| -> StdResult<_> {
+                    old_balance
+                        .unwrap_or_default()
+                        .checked_add(&distributed_amount.balance)
                 },
             )?;
         }

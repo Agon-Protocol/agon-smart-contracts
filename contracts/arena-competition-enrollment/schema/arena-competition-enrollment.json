@@ -1203,6 +1203,7 @@
           "competition_module",
           "competition_type",
           "current_members",
+          "escrow",
           "expiration",
           "group_contract",
           "has_finalized",
@@ -1243,6 +1244,9 @@
                 "type": "null"
               }
             ]
+          },
+          "escrow": {
+            "$ref": "#/definitions/Addr"
           },
           "expiration": {
             "$ref": "#/definitions/Expiration"
@@ -1397,6 +1401,7 @@
         "competition_module",
         "competition_type",
         "current_members",
+        "escrow",
         "expiration",
         "group_contract",
         "has_finalized",
@@ -1437,6 +1442,9 @@
               "type": "null"
             }
           ]
+        },
+        "escrow": {
+          "$ref": "#/definitions/Addr"
         },
         "expiration": {
           "$ref": "#/definitions/Expiration"
@@ -2006,6 +2014,7 @@
             "competition_module",
             "competition_type",
             "current_members",
+            "escrow",
             "expiration",
             "group_contract",
             "has_finalized",
@@ -2046,6 +2055,9 @@
                   "type": "null"
                 }
               ]
+            },
+            "escrow": {
+              "$ref": "#/definitions/Addr"
             },
             "expiration": {
               "$ref": "#/definitions/Expiration"
