@@ -1,5 +1,5 @@
 use arena_interface::competition::msg::{
-    EscrowInstantiateInfo, ExecuteBaseFns as _, QueryBaseFns as _,
+    EscrowContractInfo, ExecuteBaseFns as _, QueryBaseFns as _,
 };
 use arena_interface::competition::state::CompetitionStatus;
 use arena_interface::competition::stats::{
@@ -7,6 +7,7 @@ use arena_interface::competition::stats::{
 };
 use arena_interface::core::QueryExtFns;
 use arena_interface::escrow::{ExecuteMsgFns as _, QueryMsgFns as _};
+use arena_interface::fees::FeeInformation;
 use arena_interface::group::{self, GroupContractInfo};
 use arena_interface::registry::ExecuteMsgFns as _;
 use arena_wager_module::msg::WagerInstantiateExt;
@@ -36,23 +37,7 @@ fn test_create_wager() -> anyhow::Result<()> {
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
         "A test wager".to_string(),
-        Expiration::AtHeight(1000000),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[user1.clone(), user2.clone()]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        WagerInstantiateExt {},
-        "Test Wager".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -73,10 +58,27 @@ fn test_create_wager() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(1000000),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Test Wager".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         Some(vec!["Wager Rule".to_string()]),
         None,
@@ -115,23 +117,7 @@ fn test_process_wager() -> anyhow::Result<()> {
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
         "A test wager".to_string(),
-        Expiration::AtHeight(1000000),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[user1.clone(), user2.clone()]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        WagerInstantiateExt {},
-        "Test Wager".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -152,10 +138,27 @@ fn test_process_wager() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(1000000),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Test Wager".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         Some(vec!["Wager Rule".to_string()]),
         None,
@@ -200,7 +203,10 @@ fn test_process_wager() -> anyhow::Result<()> {
     assert!(result.is_some());
 
     // Withdraw
-    arena.arena_escrow.call_as(&user1).withdraw(None, None)?;
+    arena
+        .arena_escrow
+        .call_as(&user1)
+        .withdraw(None, None, None)?;
 
     // Check balances
     let user1_balance = mock.query_balance(&user1, DENOM)?;
@@ -241,6 +247,15 @@ fn test_escrow_receive_extra() -> anyhow::Result<()> {
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
         "A test wager".to_string(),
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: vec![],
+                is_enrollment: false,
+            })?,
+            label: "Wager Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -257,12 +272,6 @@ fn test_escrow_receive_extra() -> anyhow::Result<()> {
         "Test Wager".to_string(),
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg { dues: vec![] })?,
-            label: "Wager Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["Wager Rule".to_string()]),
         None,
@@ -307,23 +316,7 @@ fn test_wager_with_additional_fees() -> anyhow::Result<()> {
     // Create a wager with additional fees
     let res = arena.arena_wager_module.create_competition(
         "Wager with fees".to_string(),
-        Expiration::AtHeight(mock.block_info()?.height + 100),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[user1.clone(), user2.clone()]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        WagerInstantiateExt {},
-        "Fee Wager".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -344,15 +337,32 @@ fn test_wager_with_additional_fees() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
-            label: "Fee Wager Escrow".to_string(),
-            additional_layered_fees: Some(vec![arena_interface::fees::FeeInformation {
+            label: "Wager Escrow".to_string(),
+            additional_layered_fees: Some(vec![FeeInformation {
                 tax: Decimal::percent(2),
                 receiver: fee_receiver.to_string(),
                 cw20_msg: None,
                 cw721_msg: None,
             }]),
-        }),
+        },
+        Expiration::AtHeight(mock.block_info()?.height + 100),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Fee Wager".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         Some(vec!["Fee Wager Rule".to_string()]),
         None,
@@ -393,7 +403,10 @@ fn test_wager_with_additional_fees() -> anyhow::Result<()> {
     )?;
 
     // Withdraw
-    arena.arena_escrow.call_as(&user1).withdraw(None, None)?;
+    arena
+        .arena_escrow
+        .call_as(&user1)
+        .withdraw(None, None, None)?;
 
     // Check balances
     let user1_balance = mock.query_balance(&user1, DENOM)?;
@@ -459,23 +472,7 @@ fn test_wager_with_preset_distributions() -> anyhow::Result<()> {
     arena.arena_wager_module.set_sender(&admin);
     let res = arena.arena_wager_module.create_competition(
         "Wager with preset distributions".to_string(),
-        Expiration::AtHeight(mock.block_info()?.height + 100),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[user1.clone(), user2.clone(), user3.clone()]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        WagerInstantiateExt {},
-        "Preset Distribution Wager".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -496,10 +493,27 @@ fn test_wager_with_preset_distributions() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
-            label: "Preset Distribution Wager Escrow".to_string(),
+            label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(mock.block_info()?.height + 100),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone(), user3.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Preset Distribution Wager".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         Some(vec!["Preset Distribution Wager Rule".to_string()]),
         None,
@@ -604,23 +618,7 @@ fn test_wager_with_draw() -> anyhow::Result<()> {
     arena.arena_wager_module.set_sender(&admin);
     let res = arena.arena_wager_module.create_competition(
         "Wager".to_string(),
-        Expiration::AtHeight(mock.block_info()?.height + 100),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[user1.clone(), user2.clone()]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        WagerInstantiateExt {},
-        "Wager".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -641,10 +639,27 @@ fn test_wager_with_draw() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
-            label: "Escrow".to_string(),
+            label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(mock.block_info()?.height + 100),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Wager".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         None,
         None,
@@ -728,23 +743,7 @@ fn test_wager_with_malicious_host() -> anyhow::Result<()> {
     arena.arena_wager_module.set_sender(&admin);
     let res = arena.arena_wager_module.create_competition(
         "Wager".to_string(),
-        Expiration::AtHeight(mock.block_info()?.height + 100),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[user1.clone(), user2.clone()]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        WagerInstantiateExt {},
-        "Wager".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -765,10 +764,27 @@ fn test_wager_with_malicious_host() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
-            label: "Escrow".to_string(),
+            label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(mock.block_info()?.height + 100),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Wager".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         None,
         None,
@@ -853,23 +869,7 @@ fn test_wager_with_updated_distribution_after_activation() -> anyhow::Result<()>
     arena.arena_wager_module.set_sender(&admin);
     let res = arena.arena_wager_module.create_competition(
         "Wager with updated distribution".to_string(),
-        Expiration::AtHeight(mock.block_info()?.height + 100),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[user1.clone(), user2.clone()]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        WagerInstantiateExt {},
-        "Updated Distribution Wager".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -890,10 +890,27 @@ fn test_wager_with_updated_distribution_after_activation() -> anyhow::Result<()>
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
-            label: "Updated Distribution Wager Escrow".to_string(),
+            label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(mock.block_info()?.height + 100),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Updated Distribution Wager".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         Some(vec!["Updated Distribution Wager Rule".to_string()]),
         None,
@@ -1015,23 +1032,7 @@ fn test_jailed_wager_resolved_by_dao() -> anyhow::Result<()> {
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
         "A test wager".to_string(),
-        Expiration::AtHeight(100000),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[user1.clone(), user2.clone()]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        WagerInstantiateExt {},
-        "Test Wager".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -1052,10 +1053,27 @@ fn test_jailed_wager_resolved_by_dao() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(100000),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Test Wager".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         Some(vec!["Wager Rule".to_string()]),
         None,
@@ -1180,23 +1198,7 @@ fn test_wager_with_stats() -> anyhow::Result<()> {
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
         "A test wager with stats".to_string(),
-        Expiration::AtHeight(1000000),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[user1.clone(), user2.clone()]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        WagerInstantiateExt {},
-        "Test Wager with Stats".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -1217,10 +1219,27 @@ fn test_wager_with_stats() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
-            label: "Wager with Stats".to_string(),
+            label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(1000000),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[user1.clone(), user2.clone()]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        WagerInstantiateExt {},
+        "Test Wager with Stats".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         Some(vec!["Wager Rule".to_string()]),
         None,
@@ -1334,6 +1353,22 @@ fn test_wager_with_aggregate_stats() -> anyhow::Result<()> {
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
         "A test wager with aggregate stats".to_string(),
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: vec![MemberBalanceUnchecked {
+                    addr: user1.to_string(),
+                    balance: BalanceUnchecked {
+                        native: Some(vec![Coin::new(1000, DENOM)]),
+                        cw20: None,
+                        cw721: None,
+                    },
+                }],
+                is_enrollment: false,
+            })?,
+            label: "Wager Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -1350,21 +1385,6 @@ fn test_wager_with_aggregate_stats() -> anyhow::Result<()> {
         "Test Wager with Aggregate Stats".to_string(),
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: vec![MemberBalanceUnchecked {
-                    addr: user1.to_string(),
-                    balance: BalanceUnchecked {
-                        native: Some(vec![Coin::new(1000, DENOM)]),
-                        cw20: None,
-                        cw721: None,
-                    },
-                }],
-            })?,
-            label: "Wager with Aggregate Stats".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["Wager Rule".to_string()]),
         None,

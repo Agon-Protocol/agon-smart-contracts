@@ -1,9 +1,13 @@
 use std::iter;
 
-use arena_interface::{fees::FeeInformation, group};
+use arena_interface::{
+    escrow::{EnrollmentWithdrawMsg, TransferEscrowOwnershipMsg},
+    fees::FeeInformation,
+    group,
+};
 use cosmwasm_std::{
-    to_json_binary, Addr, Binary, CosmosMsg, DepsMut, Empty, Env, MessageInfo, Order, Response,
-    StdResult,
+    to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, DepsMut, Empty, Env, MessageInfo,
+    Order, Response, StdError, StdResult, Uint128,
 };
 use cw20::{Cw20CoinVerified, Cw20ReceiveMsg};
 use cw721::Cw721ReceiveMsg;
@@ -16,7 +20,8 @@ use cw_ownable::{assert_owner, get_ownership};
 use crate::{
     query::is_locked,
     state::{
-        is_fully_funded, BALANCE, DUE, HAS_DISTRIBUTED, INITIAL_DUE, IS_LOCKED, TOTAL_BALANCE,
+        is_fully_funded, BALANCE, DUE, HAS_DISTRIBUTED, INITIAL_DUE, IS_ENROLLMENT, IS_LOCKED,
+        TOTAL_BALANCE,
     },
     ContractError,
 };
@@ -55,48 +60,102 @@ pub fn withdraw(
     info: MessageInfo,
     cw20_msg: Option<Binary>,
     cw721_msg: Option<Binary>,
+    enrollment_withdraw_info: Option<EnrollmentWithdrawMsg>,
 ) -> Result<Response, ContractError> {
     if is_locked(deps.as_ref()) {
         return Err(ContractError::Locked {});
     }
 
-    // Load and process balance for each address
-    let balance = BALANCE.load(deps.storage, &info.sender)?;
+    let mut msgs = vec![];
+    // Load entire user balance
+    let mut balance = BALANCE.load(deps.storage, &info.sender)?;
 
     // Load the total balance
     let mut total_balance = TOTAL_BALANCE.may_load(deps.storage)?.unwrap_or_default();
 
-    let msgs = if balance.is_empty() {
-        BALANCE.remove(deps.storage, &info.sender);
+    if IS_ENROLLMENT.may_load(deps.storage)?.unwrap_or_default() {
+        let ownership = get_ownership(deps.storage)?;
 
-        vec![]
+        // Only the enrollment contract can trigger withdrawals
+        // This config is changed when the escrow is transferred to the competition modules
+        if ownership.owner.map_or(true, |x| x != info.sender) {
+            return Err(ContractError::EnrollmentWithdraw {});
+        }
+
+        match enrollment_withdraw_info {
+            Some(EnrollmentWithdrawMsg { addrs, entry_fee }) => {
+                let addrs = addrs
+                    .into_iter()
+                    .map(|addr| {
+                        let validated_addr = deps.api.addr_validate(&addr)?; // Validate the address
+
+                        // Create and push the message for this address
+                        msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                            to_address: validated_addr.to_string(),
+                            amount: vec![entry_fee.clone()],
+                        }));
+
+                        Ok(validated_addr) // Return the validated address
+                    })
+                    .collect::<StdResult<Vec<_>>>()?;
+
+                // Deduct the full entry fee balance
+                let full_entry_fee_balance = BalanceVerified {
+                    native: Some(vec![Coin {
+                        denom: entry_fee.denom.clone(),
+                        amount: entry_fee
+                            .amount
+                            .checked_mul(Uint128::new(addrs.len() as u128))?,
+                    }]),
+                    cw20: None,
+                    cw721: None,
+                };
+                balance = balance.checked_sub(&full_entry_fee_balance)?;
+                total_balance = total_balance.checked_sub(&full_entry_fee_balance)?;
+
+                // Save balance
+                if balance.is_empty() {
+                    BALANCE.remove(deps.storage, &info.sender);
+                } else {
+                    BALANCE.save(deps.storage, &info.sender, &balance)?;
+                }
+            }
+            None => {
+                return Err(ContractError::StdError(StdError::generic_err(
+                    "Enrollment withdraw msg is required when configured for enrollment contracts",
+                )))
+            }
+        };
+    } else if balance.is_empty() {
+        BALANCE.remove(deps.storage, &info.sender);
     } else {
         // Update total balance and related storage entries
-        BALANCE.remove(deps.storage, &info.sender);
         total_balance = total_balance.checked_sub(&balance)?;
 
-        let has_distributed = HAS_DISTRIBUTED.may_load(deps.storage)?.unwrap_or_default();
-        if !has_distributed {
+        if !HAS_DISTRIBUTED.may_load(deps.storage)?.unwrap_or_default() {
             // Set due to the initial due
             if let Some(initial_due) = &INITIAL_DUE.may_load(deps.storage, &info.sender)? {
                 DUE.save(deps.storage, &info.sender, initial_due)?;
             }
         }
 
-        // Update or remove total balance
-        if total_balance.is_empty() {
-            TOTAL_BALANCE.remove(deps.storage);
-        } else {
-            TOTAL_BALANCE.save(deps.storage, &total_balance)?;
-        }
+        // Clear balance
+        BALANCE.remove(deps.storage, &info.sender);
 
-        balance.transmit_all(
+        msgs = balance.transmit_all(
             deps.as_ref(),
             &info.sender,
             cw20_msg.clone(),
             cw721_msg.clone(),
-        )?
+        )?;
     };
+
+    // Update or remove total balance
+    if total_balance.is_empty() {
+        TOTAL_BALANCE.remove(deps.storage);
+    } else {
+        TOTAL_BALANCE.save(deps.storage, &total_balance)?;
+    }
 
     Ok(Response::new()
         .add_attribute("action", "withdraw")
@@ -162,6 +221,9 @@ fn receive_balance(
     addr: Addr,
     balance: BalanceVerified,
 ) -> Result<Response, ContractError> {
+    if balance.is_empty() {
+        return Err(ContractError::EmptyBalance {});
+    }
     if HAS_DISTRIBUTED.exists(deps.storage) {
         return Err(ContractError::AlreadyDistributed {});
     }
@@ -394,14 +456,29 @@ pub fn distribute(
         .add_messages(msgs))
 }
 
-pub fn lock(deps: DepsMut, info: MessageInfo, value: bool) -> Result<Response, ContractError> {
+pub fn lock(
+    deps: DepsMut,
+    info: MessageInfo,
+    value: bool,
+    transfer_ownership: Option<TransferEscrowOwnershipMsg>,
+) -> Result<Response, ContractError> {
     assert_owner(deps.storage, &info.sender)?;
 
     // Save the locked state to storage
     IS_LOCKED.save(deps.storage, &value)?;
 
-    // Build and return the response
-    Ok(Response::new()
+    let mut res = Response::new()
         .add_attribute("action", "lock")
-        .add_attribute("is_locked", value.to_string()))
+        .add_attribute("is_locked", value.to_string());
+
+    // Set new owner if provided
+    if let Some(new_ownership) = transfer_ownership {
+        let ownership =
+            cw_ownable::initialize_owner(deps.storage, deps.api, Some(&new_ownership.addr))?;
+        // Assume a transfership means we're moving from enrollment contract to
+        IS_ENROLLMENT.save(deps.storage, &new_ownership.is_enrollment)?;
+        res = res.add_attributes(ownership.into_attributes());
+    }
+
+    Ok(res)
 }

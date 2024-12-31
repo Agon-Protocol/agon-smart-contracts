@@ -52,7 +52,7 @@ pub enum ExecuteBase<ExecuteExt, CompetitionInstantiateExt> {
         /// This can only be overridden by valid competition enrollment modules
         host: Option<String>,
         category_id: Option<Uint128>,
-        escrow: Option<EscrowInstantiateInfo>,
+        escrow: EscrowContractInfo,
         name: String,
         description: String,
         expiration: Expiration,
@@ -154,15 +154,21 @@ where
 }
 
 #[cw_serde]
-pub struct EscrowInstantiateInfo {
-    /// Code ID of the contract to be instantiated.
-    pub code_id: u64,
-    /// Instantiate message to be used to create the contract.
-    pub msg: Binary,
-    /// Label for the instantiated contract.
-    pub label: String,
-    /// Optional additional layered fees
-    pub additional_layered_fees: Option<Vec<FeeInformation<String>>>,
+pub enum EscrowContractInfo {
+    Existing {
+        addr: Addr,
+        additional_layered_fees: Option<Vec<FeeInformation<String>>>,
+    },
+    New {
+        /// Code ID of the contract to be instantiated.
+        code_id: u64,
+        /// Instantiate message to be used to create the contract.
+        msg: Binary,
+        /// Label for the instantiated contract.
+        label: String,
+        /// Optional additional layered fees
+        additional_layered_fees: Option<Vec<FeeInformation<String>>>,
+    },
 }
 
 #[cw_serde]

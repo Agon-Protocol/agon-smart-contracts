@@ -32,7 +32,7 @@ pub enum ContractError {
     #[error("{0}")]
     Instantiate2AddressError(#[from] Instantiate2AddressError),
 
-    #[error("UnknownReplyId")]
+    #[error("Unknown reply ID {id}")]
     UnknownReplyId { id: u64 },
 
     #[error("Unauthorized")]
@@ -41,17 +41,17 @@ pub enum ContractError {
     #[error("Already enrolled")]
     AlreadyEnrolled {},
 
-    #[error("Cannot trigger creation with {current_members} members")]
-    TriggerFailed {
+    #[error("Cannot finalize with {current_members} members")]
+    FinalizeFailed {
         max_members: Uint64,
         current_members: Uint64,
         expiration: Expiration,
     },
 
-    #[error("Competition has already been generated or expired")]
-    AlreadyExpired {},
+    #[error("Competition has already been finalized")]
+    AlreadyFinalized {},
 
-    #[error("Entry fee was not paid")]
+    #[error("Entry fee {fee} was not paid")]
     EntryFeeNotPaid { fee: Uint128 },
 
     #[error("Not enrolled")]

@@ -1,4 +1,4 @@
-use arena_interface::{fees::FeeInformation, group::MemberMsg};
+use arena_interface::{competition::msg::EscrowContractInfo, group::MemberMsg};
 use cosmwasm_schema::{cw_serde, QueryResponses};
 use cosmwasm_std::{Coin, Uint128, Uint64};
 use cw_utils::Expiration;
@@ -28,11 +28,11 @@ pub enum ExecuteMsg {
         competition_info: CompetitionInfoMsg,
         competition_type: CompetitionType,
         group_contract_info: ModuleInstantiateInfo,
-        require_team_size: Option<u32>,
+        required_team_size: Option<u32>,
+        escrow_contract_info: EscrowContractInfo,
     },
-    TriggerExpiration {
+    Finalize {
         id: Uint128,
-        escrow_id: u64,
     },
     #[cw_orch(payable)]
     Enroll {
@@ -62,7 +62,6 @@ pub struct CompetitionInfoMsg {
     pub rules: Option<Vec<String>>,
     pub rulesets: Option<Vec<Uint128>>,
     pub banner: Option<String>,
-    pub additional_layered_fees: Option<Vec<FeeInformation<String>>>,
 }
 
 #[cw_serde]

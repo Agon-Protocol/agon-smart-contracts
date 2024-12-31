@@ -2,8 +2,8 @@ use arena_competition_enrollment::msg::{
     CompetitionInfoMsg, ExecuteMsg, ExecuteMsgFns as _, MigrateMsg, QueryMsgFns as _,
 };
 use arena_competition_enrollment::state::CompetitionType;
-use arena_interface::competition::msg::QueryBaseFns as _;
-use arena_interface::escrow::ExecuteMsgFns as _;
+use arena_interface::competition::msg::{EscrowContractInfo, QueryBaseFns as _};
+use arena_interface::escrow::{self, ExecuteMsgFns as _};
 use arena_interface::group::{self, QueryMsgFns as _};
 use arena_tournament_module::state::EliminationType;
 use cosmwasm_std::{coins, to_json_binary, CosmosMsg, Decimal, Uint128, Uint64, WasmMsg};
@@ -18,6 +18,18 @@ use crate::arena::Arena;
 use crate::tests::helpers::setup_arena;
 
 use super::{DENOM, PREFIX};
+
+fn default_escrow_contract_info(arena: &Arena<MockBech32>) -> anyhow::Result<EscrowContractInfo> {
+    Ok(EscrowContractInfo::New {
+        code_id: arena.arena_escrow.code_id()?,
+        msg: to_json_binary(&escrow::InstantiateMsg {
+            dues: vec![],
+            is_enrollment: true,
+        })?,
+        label: "Arena Escrow".to_string(),
+        additional_layered_fees: None,
+    })
+}
 
 #[test]
 fn test_competition_enrollment() -> anyhow::Result<()> {
@@ -61,7 +73,6 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
             rules: Some(vec!["Rule 1".to_string(), "Rule 2".to_string()]),
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::Tournament {
             elimination_type: EliminationType::SingleElimination {
@@ -76,7 +87,8 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     let res = arena
@@ -141,11 +153,11 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .trigger_expiration(arena.arena_escrow.code_id()?, Uint128::one())?;
+        .finalize(Uint128::one())?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
-            .any(|attr| attr.key == "action" && attr.value == "trigger_expiration")));
+            .any(|attr| attr.key == "action" && attr.value == "finalize")));
 
     // The enrollment didn't succeed, so we should be able to withdraw
     arena.arena_competition_enrollment.set_sender(&teams[0]);
@@ -183,7 +195,6 @@ fn test_invalid_enrollment() -> anyhow::Result<()> {
             rules: None,
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::Tournament {
             elimination_type: EliminationType::SingleElimination {
@@ -198,7 +209,8 @@ fn test_invalid_enrollment() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     let result = arena
@@ -252,7 +264,6 @@ fn test_enrollment_capacity() -> anyhow::Result<()> {
             rules: None,
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::Tournament {
             elimination_type: EliminationType::SingleElimination {
@@ -267,7 +278,8 @@ fn test_enrollment_capacity() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     arena
@@ -336,7 +348,6 @@ fn test_successful_tournament_creation() -> anyhow::Result<()> {
             rules: Some(vec!["Tournament Rule".to_string()]),
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::Tournament {
             elimination_type: EliminationType::SingleElimination {
@@ -351,7 +362,8 @@ fn test_successful_tournament_creation() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     arena
@@ -372,11 +384,11 @@ fn test_successful_tournament_creation() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .trigger_expiration(arena.arena_escrow.code_id()?, Uint128::one())?;
+        .finalize(Uint128::one())?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
-            .any(|attr| attr.key == "action" && attr.value == "trigger_expiration")));
+            .any(|attr| attr.key == "action" && attr.value == "finalize")));
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -425,7 +437,6 @@ fn test_successful_wager_creation() -> anyhow::Result<()> {
             rules: Some(vec!["Wager Rule".to_string()]),
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::Wager {},
         group_contract_info: ModuleInstantiateInfo {
@@ -435,7 +446,8 @@ fn test_successful_wager_creation() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     arena
@@ -458,11 +470,11 @@ fn test_successful_wager_creation() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .trigger_expiration(arena.arena_escrow.code_id()?, Uint128::one())?;
+        .finalize(Uint128::one())?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
-            .any(|attr| attr.key == "action" && attr.value == "trigger_expiration")));
+            .any(|attr| attr.key == "action" && attr.value == "finalize")));
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -513,7 +525,6 @@ fn test_successful_league_creation() -> anyhow::Result<()> {
             rules: Some(vec!["League Rule".to_string()]),
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::League {
             match_win_points: Uint64::new(3),
@@ -532,7 +543,8 @@ fn test_successful_league_creation() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     arena
@@ -553,11 +565,11 @@ fn test_successful_league_creation() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .trigger_expiration(arena.arena_escrow.code_id()?, Uint128::one())?;
+        .finalize(Uint128::one())?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
-            .any(|attr| attr.key == "action" && attr.value == "trigger_expiration")));
+            .any(|attr| attr.key == "action" && attr.value == "finalize")));
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -567,7 +579,7 @@ fn test_successful_league_creation() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_trigger_expiration_without_escrow() -> anyhow::Result<()> {
+fn test_finalize_without_escrow() -> anyhow::Result<()> {
     let mock = MockBech32::new(PREFIX);
     let (mut arena, admin) = setup_arena(&mock)?;
 
@@ -602,7 +614,6 @@ fn test_trigger_expiration_without_escrow() -> anyhow::Result<()> {
             rules: Some(vec!["Rule 1".to_string()]),
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::Wager {},
         group_contract_info: ModuleInstantiateInfo {
@@ -612,7 +623,8 @@ fn test_trigger_expiration_without_escrow() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     arena
@@ -636,13 +648,13 @@ fn test_trigger_expiration_without_escrow() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .trigger_expiration(arena.arena_escrow.code_id()?, Uint128::one())?;
+        .finalize(Uint128::one())?;
 
     // Check that the competition was created
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
-            .any(|attr| attr.key == "action" && attr.value == "trigger_expiration")));
+            .any(|attr| attr.key == "action" && attr.value == "finalize")));
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -652,7 +664,7 @@ fn test_trigger_expiration_without_escrow() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_trigger_expiration_before_min_members() -> anyhow::Result<()> {
+fn test_finalize_before_min_members() -> anyhow::Result<()> {
     let mock = MockBech32::new(PREFIX);
     let (mut arena, admin) = setup_arena(&mock)?;
 
@@ -687,7 +699,6 @@ fn test_trigger_expiration_before_min_members() -> anyhow::Result<()> {
             rules: Some(vec!["Rule 1".to_string()]),
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::Tournament {
             elimination_type: EliminationType::SingleElimination {
@@ -702,7 +713,8 @@ fn test_trigger_expiration_before_min_members() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     arena
@@ -726,13 +738,13 @@ fn test_trigger_expiration_before_min_members() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .trigger_expiration(arena.arena_escrow.code_id()?, Uint128::one())?;
+        .finalize(Uint128::one())?;
 
     // Check that the competition was not created
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
-            .any(|attr| attr.key == "result" && attr.value == "expired_insufficient_members")));
+            .any(|attr| attr.key == "result" && attr.value == "finalized_insufficient_members")));
 
     // Attempt to withdraw for each enrolled team
     for team in teams {
@@ -771,7 +783,6 @@ fn test_unregistered_competition_enrollment() -> anyhow::Result<()> {
             rules: Some(vec!["Rule 1".to_string()]),
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::Tournament {
             elimination_type: EliminationType::SingleElimination {
@@ -786,7 +797,8 @@ fn test_unregistered_competition_enrollment() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     arena
@@ -810,7 +822,7 @@ fn test_unregistered_competition_enrollment() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .trigger_expiration(arena.arena_escrow.code_id()?, Uint128::one())?;
+        .finalize(Uint128::one())?;
 
     // Check that the competition was not created due to reply on error
     assert!(res
@@ -877,7 +889,6 @@ fn test_huge_tournament() -> anyhow::Result<()> {
             rules: Some(vec!["Tournament Rule".to_string()]),
             rulesets: None,
             banner: None,
-            additional_layered_fees: None,
         },
         competition_type: CompetitionType::Tournament {
             elimination_type: EliminationType::SingleElimination {
@@ -892,7 +903,8 @@ fn test_huge_tournament() -> anyhow::Result<()> {
             funds: vec![],
             label: "Arena Group".to_string(),
         },
-        require_team_size: None,
+        required_team_size: None,
+        escrow_contract_info: default_escrow_contract_info(&arena)?,
     };
 
     arena
@@ -913,11 +925,11 @@ fn test_huge_tournament() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .trigger_expiration(arena.arena_escrow.code_id()?, Uint128::one())?;
+        .finalize(Uint128::one())?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
-            .any(|attr| attr.key == "action" && attr.value == "trigger_expiration")));
+            .any(|attr| attr.key == "action" && attr.value == "finalize")));
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -926,9 +938,7 @@ fn test_huge_tournament() -> anyhow::Result<()> {
     // Test tipping
     let competition = arena.arena_tournament_module.competition(Uint128::one())?;
     arena.arena_escrow.set_sender(&teams[0]);
-    arena
-        .arena_escrow
-        .set_address(competition.escrow.as_ref().unwrap());
+    arena.arena_escrow.set_address(&competition.escrow);
     arena
         .arena_escrow
         .receive_native(coins(5000u128, DENOM).as_slice())?;

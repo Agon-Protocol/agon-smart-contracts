@@ -1,4 +1,6 @@
+pub use arena::*;
 use cw_orch::{anyhow, prelude::*};
+pub use dao_dao::*;
 use orch_interface::{
     arena_competition_enrollment::ArenaCompetitionEnrollmentContract,
     arena_core::ArenaCoreContract, arena_discord_identity::ArenaDiscordIdentityContract,
@@ -10,6 +12,11 @@ use orch_interface::{
     arena_wager_module::ArenaWagerModuleContract, dao_dao_core::DaoDaoCoreContract,
 };
 use std::env;
+
+mod arena;
+mod dao_dao;
+#[cfg(test)]
+mod tests;
 
 fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();

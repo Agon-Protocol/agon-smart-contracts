@@ -6,7 +6,7 @@ use std::{
 use arena_interface::{
     competition::{
         msg::{
-            CompetitionsFilter, EscrowInstantiateInfo, ExecuteBase, HookDirection, InstantiateBase,
+            CompetitionsFilter, EscrowContractInfo, ExecuteBase, HookDirection, InstantiateBase,
             QueryBase, ToCompetitionExt,
         },
         state::{
@@ -411,15 +411,13 @@ impl<
             .into_iter()
             .filter(|x| !matches!(x.status, CompetitionStatus::Inactive))
         {
-            if let Some(escrow) = &competition.escrow {
-                let msg = WasmMsg::Migrate {
-                    contract_addr: escrow.to_string(),
-                    new_code_id: escrow_code_id,
-                    msg: to_json_binary(&escrow_migrate_msg)?,
-                };
+            let msg = WasmMsg::Migrate {
+                contract_addr: competition.escrow.to_string(),
+                new_code_id: escrow_code_id,
+                msg: to_json_binary(&escrow_migrate_msg)?,
+            };
 
-                messages.push(SubMsg::reply_on_error(msg, MIGRATE_ESCROW_ERROR_REPLY_ID));
-            }
+            messages.push(SubMsg::reply_on_error(msg, MIGRATE_ESCROW_ERROR_REPLY_ID));
         }
 
         let length = messages.len();
@@ -679,7 +677,7 @@ impl<
         info: &MessageInfo,
         host: Option<String>,
         category_id: Option<Uint128>,
-        escrow: Option<EscrowInstantiateInfo>,
+        escrow: EscrowContractInfo,
         name: String,
         description: String,
         expiration: cw_utils::Expiration,
@@ -736,48 +734,67 @@ impl<
         let mut msgs = vec![];
 
         // Handle escrow setup
-        let (escrow_addr, fees, status) = if let Some(escrow) = escrow {
-            let fees = escrow
-                .additional_layered_fees
-                .map(|fees| {
-                    fees.iter()
-                        .map(|fee| fee.into_checked(deps.as_ref()))
-                        .collect::<StdResult<Vec<_>>>()
-                })
-                .transpose()?;
+        let (escrow_addr, fees, status) = match escrow {
+            EscrowContractInfo::Existing {
+                addr,
+                additional_layered_fees,
+            } => {
+                let fees = additional_layered_fees
+                    .map(|fees| {
+                        fees.iter()
+                            .map(|fee| fee.into_checked(deps.as_ref()))
+                            .collect::<StdResult<Vec<_>>>()
+                    })
+                    .transpose()?;
 
-            let binding = format!("{}{}{}", info.sender, env.block.height, competition_id);
-            let salt: [u8; 32] = Sha256::digest(binding.as_bytes()).into();
-            let canonical_creator = deps.api.addr_canonicalize(env.contract.address.as_str())?;
-            let code_info = deps.querier.query_wasm_code_info(escrow.code_id)?;
-            let canonical_addr =
-                instantiate2_address(&code_info.checksum, &canonical_creator, &salt)?;
+                (
+                    addr,
+                    fees,
+                    CompetitionStatus::Active {
+                        activation_height: env.block.height,
+                    },
+                )
+            }
+            EscrowContractInfo::New {
+                code_id,
+                msg,
+                label,
+                additional_layered_fees,
+            } => {
+                let fees = additional_layered_fees
+                    .map(|fees| {
+                        fees.iter()
+                            .map(|fee| fee.into_checked(deps.as_ref()))
+                            .collect::<StdResult<Vec<_>>>()
+                    })
+                    .transpose()?;
 
-            msgs.push(CosmosMsg::Wasm(WasmMsg::Instantiate2 {
-                admin: Some(env.contract.address.to_string()),
-                code_id: escrow.code_id,
-                label: escrow.label,
-                msg: escrow.msg,
-                funds: vec![],
-                salt: salt.into(),
-            }));
+                let binding = format!("{}{}{}", info.sender, env.block.height, competition_id);
+                let salt: [u8; 32] = Sha256::digest(binding.as_bytes()).into();
+                let canonical_creator =
+                    deps.api.addr_canonicalize(env.contract.address.as_str())?;
+                let code_info = deps.querier.query_wasm_code_info(code_id)?;
+                let canonical_addr =
+                    instantiate2_address(&code_info.checksum, &canonical_creator, &salt)?;
 
-            let escrow_addr = deps.api.addr_humanize(&canonical_addr)?;
-            self.escrows_to_competitions.save(
-                deps.storage,
-                &escrow_addr,
-                &competition_id.u128(),
-            )?;
+                msgs.push(CosmosMsg::Wasm(WasmMsg::Instantiate2 {
+                    admin: Some(env.contract.address.to_string()),
+                    code_id,
+                    label,
+                    msg,
+                    funds: vec![],
+                    salt: salt.into(),
+                }));
 
-            (Some(escrow_addr), fees, CompetitionStatus::Pending)
-        } else {
-            (
-                None,
-                None,
-                CompetitionStatus::Active {
-                    activation_height: env.block.height,
-                },
-            )
+                let escrow_addr = deps.api.addr_humanize(&canonical_addr)?;
+                self.escrows_to_competitions.save(
+                    deps.storage,
+                    &escrow_addr,
+                    &competition_id.u128(),
+                )?;
+
+                (escrow_addr, fees, CompetitionStatus::Pending)
+            }
         };
 
         // Validate category and rulesets
@@ -813,12 +830,7 @@ impl<
         let response = Response::new()
             .add_attribute("action", "create_competition")
             .add_attribute("competition_id", competition_id)
-            .add_attribute(
-                "escrow_addr",
-                escrow_addr
-                    .as_ref()
-                    .map_or_else(|| "None".to_string(), |addr| addr.to_string()),
-            )
+            .add_attribute("escrow_addr", escrow_addr.to_string())
             .add_attribute("host", host.to_string())
             .add_messages(msgs);
 
@@ -1001,71 +1013,67 @@ impl<
             })
             .collect();
 
-        // If there's an escrow, handle distribution, tax, and fees
-        if let Some(escrow) = &competition.escrow {
-            // Get Arena Tax config
-            let arena_tax_config =
-                self.query_arena_tax_config(deps.as_ref(), competition.start_height)?;
+        // Handle distribution, tax, and fees
+        // Get Arena Tax config
+        let arena_tax_config =
+            self.query_arena_tax_config(deps.as_ref(), competition.start_height)?;
 
-            let mut layered_fees = vec![];
+        let mut layered_fees = vec![];
 
-            // Apply Arena Tax
-            if !arena_tax_config.tax.is_zero() {
-                layered_fees.push(FeeInformation {
-                    tax: arena_tax_config.tax,
-                    receiver: competition.admin_dao.to_string(),
-                    cw20_msg: arena_tax_config.cw20_msg.clone(),
-                    cw721_msg: arena_tax_config.cw721_msg.clone(),
-                });
-            }
-
-            // Apply additional layered fees
-            if let Some(additional_layered_fees) = &competition.fees {
-                layered_fees.extend(additional_layered_fees.iter().map(|x| FeeInformation {
-                    tax: x.tax,
-                    receiver: x.receiver.to_string(),
-                    cw20_msg: x.cw20_msg.clone(),
-                    cw721_msg: x.cw721_msg.clone(),
-                }));
-            }
-
-            let layered_fees = if layered_fees.is_empty() {
-                None
-            } else {
-                Some(layered_fees)
-            };
-
-            match competition.status {
-                CompetitionStatus::Jailed { activation_height }
-                | CompetitionStatus::Active { activation_height } => {
-                    let sub_msg = SubMsg::reply_on_success(
-                        CosmosMsg::Wasm(WasmMsg::Execute {
-                            contract_addr: escrow.to_string(),
-                            msg: to_json_binary(
-                                &arena_interface::escrow::ExecuteMsg::Distribute {
-                                    distribution: distribution_msg,
-                                    layered_fees,
-                                    activation_height: Some(activation_height),
-                                    group_contract: competition.group_contract.to_string(),
-                                },
-                            )?,
-                            funds: vec![],
-                        }),
-                        PROCESS_REPLY_ID,
-                    );
-
-                    self.temp_competition_id
-                        .save(deps.storage, &competition.id.u128())?;
-
-                    msgs.push(sub_msg);
-
-                    Ok(())
-                }
-                _ => Err(CompetitionError::InvalidCompetitionStatus {
-                    current_status: competition.status.clone(),
-                }),
-            }?;
+        // Apply Arena Tax
+        if !arena_tax_config.tax.is_zero() {
+            layered_fees.push(FeeInformation {
+                tax: arena_tax_config.tax,
+                receiver: competition.admin_dao.to_string(),
+                cw20_msg: arena_tax_config.cw20_msg.clone(),
+                cw721_msg: arena_tax_config.cw721_msg.clone(),
+            });
         }
+
+        // Apply additional layered fees
+        if let Some(additional_layered_fees) = &competition.fees {
+            layered_fees.extend(additional_layered_fees.iter().map(|x| FeeInformation {
+                tax: x.tax,
+                receiver: x.receiver.to_string(),
+                cw20_msg: x.cw20_msg.clone(),
+                cw721_msg: x.cw721_msg.clone(),
+            }));
+        }
+
+        let layered_fees = if layered_fees.is_empty() {
+            None
+        } else {
+            Some(layered_fees)
+        };
+
+        match competition.status {
+            CompetitionStatus::Jailed { activation_height }
+            | CompetitionStatus::Active { activation_height } => {
+                let sub_msg = SubMsg::reply_on_success(
+                    CosmosMsg::Wasm(WasmMsg::Execute {
+                        contract_addr: competition.escrow.to_string(),
+                        msg: to_json_binary(&arena_interface::escrow::ExecuteMsg::Distribute {
+                            distribution: distribution_msg,
+                            layered_fees,
+                            activation_height: Some(activation_height),
+                            group_contract: competition.group_contract.to_string(),
+                        })?,
+                        funds: vec![],
+                    }),
+                    PROCESS_REPLY_ID,
+                );
+
+                self.temp_competition_id
+                    .save(deps.storage, &competition.id.u128())?;
+
+                msgs.push(sub_msg);
+
+                Ok(())
+            }
+            _ => Err(CompetitionError::InvalidCompetitionStatus {
+                current_status: competition.status.clone(),
+            }),
+        }?;
 
         // Tax info is displayed in the escrow response
         Ok(Response::new()

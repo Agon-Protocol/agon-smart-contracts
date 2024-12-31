@@ -1,14 +1,15 @@
 use std::str::FromStr;
 
+use arena_interface::escrow::{self, TransferEscrowOwnershipMsg};
 use arena_tournament_module::state::EliminationType;
 use cosmwasm_std::{
-    entry_point, to_json_binary, Binary, CosmosMsg, Deps, DepsMut, Env, MessageInfo, Reply,
-    Response, StdError, StdResult, SubMsgResult, Uint128, WasmMsg,
+    entry_point, to_json_binary, Binary, Deps, DepsMut, Env, MessageInfo, Reply, Response,
+    StdError, StdResult, SubMsgResult, Uint128, WasmMsg,
 };
 use cw2::{ensure_from_older_version, set_contract_version};
 
 use crate::{
-    execute::{self, TRIGGER_COMPETITION_REPLY_ID},
+    execute::{self, FINALIZE_COMPETITION_REPLY_ID},
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     query,
     state::{
@@ -58,7 +59,8 @@ pub fn execute(
             competition_info,
             competition_type,
             group_contract_info,
-            require_team_size,
+            required_team_size,
+            escrow_contract_info,
         } => execute::create_enrollment(
             deps,
             env,
@@ -71,14 +73,13 @@ pub fn execute(
             competition_info,
             competition_type,
             group_contract_info,
-            require_team_size,
+            required_team_size,
+            escrow_contract_info,
         ),
         ExecuteMsg::SetRankings { id, rankings } => {
             execute::set_rankings(deps, env, info, id, rankings)
         }
-        ExecuteMsg::TriggerExpiration { id, escrow_id } => {
-            execute::trigger_expiration(deps, env, info, id, escrow_id)
-        }
+        ExecuteMsg::Finalize { id } => execute::finalize(deps, env, info, id),
         ExecuteMsg::Enroll { id, team } => execute::enroll(deps, env, info, id, team),
         ExecuteMsg::Withdraw { id } => execute::withdraw(deps, env, info, id),
         ExecuteMsg::ForceWithdraw { id, members } => {
@@ -152,7 +153,7 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, Co
 #[cfg_attr(not(feature = "library"), entry_point)]
 pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractError> {
     match msg.id {
-        TRIGGER_COMPETITION_REPLY_ID => {
+        FINALIZE_COMPETITION_REPLY_ID => {
             let enrollment_info = TEMP_ENROLLMENT_INFO.load(deps.storage)?;
             match msg.result {
                 SubMsgResult::Ok(response) => {
@@ -169,35 +170,17 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
                             .map(|y| y.value.clone())
                     });
 
-                    let escrow_addr = event.and_then(|x| {
-                        x.attributes
-                            .iter()
-                            .find(|y| y.key == "escrow_addr")
-                            .map(|y| y.value.clone())
-                    });
-
                     if let Some(competition_id) = competition_id {
-                        let mut msgs = vec![];
                         enrollment_entries().update(
                             deps.storage,
                             enrollment_info.enrollment_id,
                             |x| -> StdResult<_> {
                                 match x {
                                     Some(mut enrollment_entry) => {
-                                        enrollment_entry.has_triggered_expiration = true;
                                         enrollment_entry.competition_info =
                                             CompetitionInfo::Existing {
                                                 id: Uint128::from_str(&competition_id)?,
                                             };
-                                        if let Some(escrow_addr) = escrow_addr {
-                                            if let Ok(escrow_addr) =  deps.api.addr_validate(&escrow_addr){
-                                                msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
-                                                    contract_addr: escrow_addr.to_string(),
-                                                    msg: to_json_binary(&arena_interface::escrow::ExecuteMsg::ReceiveNative {
-                                                 })?,
-                                                 funds: vec![enrollment_info.amount.unwrap()] }));
-                                            }
-                                        }
                                         Ok(enrollment_entry)
                                     }
                                     None => Err(StdError::generic_err(format!(
@@ -207,39 +190,32 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
                                 }
                             },
                         )?;
+
+                        let escrow_msg = WasmMsg::Execute {
+                            contract_addr: enrollment_info.escrow_addr.to_string(),
+                            msg: to_json_binary(&escrow::ExecuteMsg::Lock {
+                                value: true,
+                                transfer_ownership: Some(TransferEscrowOwnershipMsg {
+                                    addr: enrollment_info.module_addr.to_string(),
+                                    is_enrollment: false,
+                                }),
+                            })?,
+                            funds: vec![],
+                        };
+
                         Ok(Response::new()
-                            .add_attribute("reply", "reply_trigger_competition")
+                            .add_attribute("reply", "reply_finalize")
                             .add_attribute("result", "competition_created")
-                            .add_messages(msgs))
+                            .add_message(escrow_msg))
                     } else {
                         Err(ContractError::StdError(StdError::generic_err(
                             "Missing competition_id",
                         )))
                     }
                 }
-                SubMsgResult::Err(error_message) => {
-                    enrollment_entries().update(
-                        deps.storage,
-                        enrollment_info.enrollment_id,
-                        |x| -> StdResult<_> {
-                            match x {
-                                Some(mut enrollment_entry) => {
-                                    enrollment_entry.has_triggered_expiration = true;
-
-                                    Ok(enrollment_entry)
-                                }
-                                None => Err(StdError::generic_err(format!(
-                                    "Cannot find the enrollment entry {}",
-                                    enrollment_info.enrollment_id
-                                ))),
-                            }
-                        },
-                    )?;
-
-                    Ok(Response::new()
-                        .add_attribute("reply", "reply_trigger_competition")
-                        .add_attribute("error", error_message))
-                }
+                SubMsgResult::Err(error_message) => Ok(Response::new()
+                    .add_attribute("reply", "reply_finalize")
+                    .add_attribute("error", error_message)),
             }
         }
         _ => Err(ContractError::UnknownReplyId { id: msg.id }),
