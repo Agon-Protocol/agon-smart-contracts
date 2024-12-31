@@ -169,6 +169,7 @@
             "type": "object",
             "required": [
               "description",
+              "escrow",
               "expiration",
               "group_contract",
               "instantiate_extension",
@@ -195,14 +196,7 @@
                 "type": "string"
               },
               "escrow": {
-                "anyOf": [
-                  {
-                    "$ref": "#/definitions/EscrowInstantiateInfo"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "$ref": "#/definitions/EscrowContractInfo"
               },
               "expiration": {
                 "$ref": "#/definitions/Expiration"
@@ -511,6 +505,10 @@
           }
         ]
       },
+      "Addr": {
+        "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+        "type": "string"
+      },
       "Admin": {
         "description": "Information about the CosmWasm level admin of a contract. Used in conjunction with `ModuleInstantiateInfo` to instantiate modules.",
         "oneOf": [
@@ -713,44 +711,87 @@
         },
         "additionalProperties": false
       },
-      "EscrowInstantiateInfo": {
-        "type": "object",
-        "required": [
-          "code_id",
-          "label",
-          "msg"
-        ],
-        "properties": {
-          "additional_layered_fees": {
-            "description": "Optional additional layered fees",
-            "type": [
-              "array",
-              "null"
+      "EscrowContractInfo": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "existing"
             ],
-            "items": {
-              "$ref": "#/definitions/FeeInformation_for_String"
-            }
-          },
-          "code_id": {
-            "description": "Code ID of the contract to be instantiated.",
-            "type": "integer",
-            "format": "uint64",
-            "minimum": 0.0
-          },
-          "label": {
-            "description": "Label for the instantiated contract.",
-            "type": "string"
-          },
-          "msg": {
-            "description": "Instantiate message to be used to create the contract.",
-            "allOf": [
-              {
-                "$ref": "#/definitions/Binary"
+            "properties": {
+              "existing": {
+                "type": "object",
+                "required": [
+                  "addr"
+                ],
+                "properties": {
+                  "additional_layered_fees": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/definitions/FeeInformation_for_String"
+                    }
+                  },
+                  "addr": {
+                    "$ref": "#/definitions/Addr"
+                  }
+                },
+                "additionalProperties": false
               }
-            ]
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "new"
+            ],
+            "properties": {
+              "new": {
+                "type": "object",
+                "required": [
+                  "code_id",
+                  "label",
+                  "msg"
+                ],
+                "properties": {
+                  "additional_layered_fees": {
+                    "description": "Optional additional layered fees",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/definitions/FeeInformation_for_String"
+                    }
+                  },
+                  "code_id": {
+                    "description": "Code ID of the contract to be instantiated.",
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0.0
+                  },
+                  "label": {
+                    "description": "Label for the instantiated contract.",
+                    "type": "string"
+                  },
+                  "msg": {
+                    "description": "Instantiate message to be used to create the contract.",
+                    "allOf": [
+                      {
+                        "$ref": "#/definitions/Binary"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
           }
-        },
-        "additionalProperties": false
+        ]
       },
       "ExecuteExt": {
         "type": "string",
@@ -1663,27 +1704,6 @@
           }
         },
         "additionalProperties": false
-      },
-      {
-        "type": "object",
-        "required": [
-          "with_group_address"
-        ],
-        "properties": {
-          "with_group_address": {
-            "type": "object",
-            "required": [
-              "group_contract"
-            ],
-            "properties": {
-              "group_contract": {
-                "type": "string"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
       }
     ]
   },
@@ -1701,6 +1721,7 @@
       "type": "object",
       "required": [
         "description",
+        "escrow",
         "expiration",
         "extension",
         "group_contract",
@@ -1732,14 +1753,7 @@
           "type": "string"
         },
         "escrow": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Addr"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "$ref": "#/definitions/Addr"
         },
         "expiration": {
           "$ref": "#/definitions/Expiration"
@@ -2001,6 +2015,7 @@
           "type": "object",
           "required": [
             "description",
+            "escrow",
             "expiration",
             "extension",
             "group_contract",
@@ -2032,14 +2047,7 @@
               "type": "string"
             },
             "escrow": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Addr"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "$ref": "#/definitions/Addr"
             },
             "expiration": {
               "$ref": "#/definitions/Expiration"

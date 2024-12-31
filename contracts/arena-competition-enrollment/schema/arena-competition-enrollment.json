@@ -31,6 +31,7 @@
             "required": [
               "competition_info",
               "competition_type",
+              "escrow_contract_info",
               "expiration",
               "group_contract_info",
               "max_members"
@@ -63,6 +64,9 @@
                   }
                 ]
               },
+              "escrow_contract_info": {
+                "$ref": "#/definitions/EscrowContractInfo"
+              },
               "expiration": {
                 "$ref": "#/definitions/Expiration"
               },
@@ -83,7 +87,7 @@
                   }
                 ]
               },
-              "require_team_size": {
+              "required_team_size": {
                 "type": [
                   "integer",
                   "null"
@@ -100,21 +104,15 @@
       {
         "type": "object",
         "required": [
-          "trigger_expiration"
+          "finalize"
         ],
         "properties": {
-          "trigger_expiration": {
+          "finalize": {
             "type": "object",
             "required": [
-              "escrow_id",
               "id"
             ],
             "properties": {
-              "escrow_id": {
-                "type": "integer",
-                "format": "uint64",
-                "minimum": 0.0
-              },
               "id": {
                 "$ref": "#/definitions/Uint128"
               }
@@ -295,6 +293,10 @@
           }
         ]
       },
+      "Addr": {
+        "description": "A human readable address.\n\nIn Cosmos, this is typically bech32 encoded. But for multi-chain smart contracts no assumptions should be made other than being UTF-8 encoded and of reasonable length.\n\nThis type represents a validated address. It can be created in the following ways 1. Use `Addr::unchecked(input)` 2. Use `let checked: Addr = deps.api.addr_validate(input)?` 3. Use `let checked: Addr = deps.api.addr_humanize(canonical_addr)?` 4. Deserialize from JSON. This must only be done from JSON that was validated before such as a contract's state. `Addr` must not be used in messages sent by the user because this would result in unvalidated instances.\n\nThis type is immutable. If you really need to mutate it (Really? Are you sure?), create a mutable copy using `let mut mutable = Addr::to_string()` and operate on that `String` instance.",
+        "type": "string"
+      },
       "Admin": {
         "description": "Information about the CosmWasm level admin of a contract. Used in conjunction with `ModuleInstantiateInfo` to instantiate modules.",
         "oneOf": [
@@ -363,15 +365,6 @@
           "name"
         ],
         "properties": {
-          "additional_layered_fees": {
-            "type": [
-              "array",
-              "null"
-            ],
-            "items": {
-              "$ref": "#/definitions/FeeInformation_for_String"
-            }
-          },
           "banner": {
             "type": [
               "string",
@@ -515,6 +508,88 @@
                 "properties": {
                   "play_third_place_match": {
                     "type": "boolean"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      },
+      "EscrowContractInfo": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "existing"
+            ],
+            "properties": {
+              "existing": {
+                "type": "object",
+                "required": [
+                  "addr"
+                ],
+                "properties": {
+                  "additional_layered_fees": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/definitions/FeeInformation_for_String"
+                    }
+                  },
+                  "addr": {
+                    "$ref": "#/definitions/Addr"
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "new"
+            ],
+            "properties": {
+              "new": {
+                "type": "object",
+                "required": [
+                  "code_id",
+                  "label",
+                  "msg"
+                ],
+                "properties": {
+                  "additional_layered_fees": {
+                    "description": "Optional additional layered fees",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/definitions/FeeInformation_for_String"
+                    }
+                  },
+                  "code_id": {
+                    "description": "Code ID of the contract to be instantiated.",
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0.0
+                  },
+                  "label": {
+                    "description": "Label for the instantiated contract.",
+                    "type": "string"
+                  },
+                  "msg": {
+                    "description": "Instantiate message to be used to create the contract.",
+                    "allOf": [
+                      {
+                        "$ref": "#/definitions/Binary"
+                      }
+                    ]
                   }
                 },
                 "additionalProperties": false
@@ -879,29 +954,6 @@
       {
         "type": "object",
         "required": [
-          "with_group_id"
-        ],
-        "properties": {
-          "with_group_id": {
-            "type": "object",
-            "required": [
-              "group_id"
-            ],
-            "properties": {
-              "group_id": {
-                "type": "integer",
-                "format": "uint64",
-                "minimum": 0.0
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "type": "object",
-        "required": [
           "remove_third_place_match"
         ],
         "properties": {
@@ -979,7 +1031,7 @@
               "null"
             ],
             "items": {
-              "$ref": "#/definitions/FeeInformation_for_String"
+              "$ref": "#/definitions/FeeInformation_for_Addr"
             }
           },
           "banner": {
@@ -1153,7 +1205,7 @@
           "current_members",
           "expiration",
           "group_contract",
-          "has_triggered_expiration",
+          "has_finalized",
           "host",
           "id",
           "is_expired",
@@ -1198,7 +1250,7 @@
           "group_contract": {
             "$ref": "#/definitions/Addr"
           },
-          "has_triggered_expiration": {
+          "has_finalized": {
             "type": "boolean"
           },
           "host": {
@@ -1281,7 +1333,7 @@
           }
         ]
       },
-      "FeeInformation_for_String": {
+      "FeeInformation_for_Addr": {
         "type": "object",
         "required": [
           "receiver",
@@ -1309,7 +1361,7 @@
             ]
           },
           "receiver": {
-            "type": "string"
+            "$ref": "#/definitions/Addr"
           },
           "tax": {
             "$ref": "#/definitions/Decimal"
@@ -1347,7 +1399,7 @@
         "current_members",
         "expiration",
         "group_contract",
-        "has_triggered_expiration",
+        "has_finalized",
         "host",
         "id",
         "is_expired",
@@ -1392,7 +1444,7 @@
         "group_contract": {
           "$ref": "#/definitions/Addr"
         },
-        "has_triggered_expiration": {
+        "has_finalized": {
           "type": "boolean"
         },
         "host": {
@@ -1465,7 +1517,7 @@
                 "null"
               ],
               "items": {
-                "$ref": "#/definitions/FeeInformation_for_String"
+                "$ref": "#/definitions/FeeInformation_for_Addr"
               }
             },
             "banner": {
@@ -1677,7 +1729,7 @@
             }
           ]
         },
-        "FeeInformation_for_String": {
+        "FeeInformation_for_Addr": {
           "type": "object",
           "required": [
             "receiver",
@@ -1705,7 +1757,7 @@
               ]
             },
             "receiver": {
-              "type": "string"
+              "$ref": "#/definitions/Addr"
             },
             "tax": {
               "$ref": "#/definitions/Decimal"
@@ -1782,7 +1834,7 @@
                 "null"
               ],
               "items": {
-                "$ref": "#/definitions/FeeInformation_for_String"
+                "$ref": "#/definitions/FeeInformation_for_Addr"
               }
             },
             "banner": {
@@ -1956,7 +2008,7 @@
             "current_members",
             "expiration",
             "group_contract",
-            "has_triggered_expiration",
+            "has_finalized",
             "host",
             "id",
             "is_expired",
@@ -2001,7 +2053,7 @@
             "group_contract": {
               "$ref": "#/definitions/Addr"
             },
-            "has_triggered_expiration": {
+            "has_finalized": {
               "type": "boolean"
             },
             "host": {
@@ -2084,7 +2136,7 @@
             }
           ]
         },
-        "FeeInformation_for_String": {
+        "FeeInformation_for_Addr": {
           "type": "object",
           "required": [
             "receiver",
@@ -2112,7 +2164,7 @@
               ]
             },
             "receiver": {
-              "type": "string"
+              "$ref": "#/definitions/Addr"
             },
             "tax": {
               "$ref": "#/definitions/Decimal"
