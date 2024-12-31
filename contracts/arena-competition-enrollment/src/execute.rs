@@ -433,9 +433,7 @@ pub fn enroll(
 
         ensure!(
             paid_amount == entry_fee.amount,
-            ContractError::EntryFeeNotPaid {
-                fee: entry_fee.amount
-            }
+            ContractError::EntryFeeNotPaid { entry_fee }
         );
 
         msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {

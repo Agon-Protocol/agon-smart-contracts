@@ -131,7 +131,7 @@ impl<Chain: CwEnv> cw_orch::contract::Deploy<Chain> for Arena<Chain> {
                                             name: "Other Category".to_string(),
                                         },
                                     ]),
-                                    tax: Decimal::from_ratio(5u128, 100u128),
+                                    tax: Decimal::percent(5),
                                     tax_configuration: TaxConfiguration {
                                         cw20_msg: None,
                                         cw721_msg: None,

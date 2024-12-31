@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    CheckedFromRatioError, DecimalRangeExceeded, Instantiate2AddressError, OverflowError, StdError,
-    Uint128, Uint64,
+    CheckedFromRatioError, Coin, DecimalRangeExceeded, Instantiate2AddressError, OverflowError,
+    StdError, Uint64,
 };
 use cw_ownable::OwnershipError;
 use cw_utils::{Expiration, ParseReplyError, PaymentError};
@@ -51,8 +51,8 @@ pub enum ContractError {
     #[error("Competition has already been finalized")]
     AlreadyFinalized {},
 
-    #[error("Entry fee {fee} was not paid")]
-    EntryFeeNotPaid { fee: Uint128 },
+    #[error("Entry fee {entry_fee} was not paid")]
+    EntryFeeNotPaid { entry_fee: Coin },
 
     #[error("Not enrolled")]
     NotEnrolled {},

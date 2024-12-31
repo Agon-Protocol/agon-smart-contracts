@@ -57,6 +57,7 @@ pub struct EnrollmentEntryResponse {
     pub competition_module: Addr,
     pub group_contract: Addr,
     pub require_team_size: Option<u32>,
+    pub escrow: Addr,
 }
 
 #[cw_serde]
@@ -102,6 +103,7 @@ impl EnrollmentEntry {
             competition_module: self.competition_module,
             group_contract: self.group_contract,
             require_team_size: self.required_team_size,
+            escrow: self.escrow,
         })
     }
 }

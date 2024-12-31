@@ -230,11 +230,9 @@ fn receive_balance(
 
     // Update the stored balance for the given address
     let updated_balance =
-        BALANCE.update(deps.storage, &addr, |maybe_balance| match maybe_balance {
-            Some(existing_balance) => existing_balance.checked_add(&balance),
-            None => Ok(balance),
+        BALANCE.update(deps.storage, &addr, |existing_balance| -> StdResult<_> {
+            existing_balance.unwrap_or_default().checked_add(&balance)
         })?;
-
     let mut msgs: Vec<CosmosMsg> = vec![];
 
     // Check if the address has a due balance
@@ -269,9 +267,9 @@ fn receive_balance(
 
     // Update the total balance in storage
     if TOTAL_BALANCE.exists(deps.storage) {
-        TOTAL_BALANCE.update(deps.storage, |total| total.checked_add(&updated_balance))?;
+        TOTAL_BALANCE.update(deps.storage, |total| total.checked_add(&balance))?;
     } else {
-        TOTAL_BALANCE.save(deps.storage, &updated_balance)?;
+        TOTAL_BALANCE.save(deps.storage, &balance)?;
     }
 
     Ok(Response::new()
