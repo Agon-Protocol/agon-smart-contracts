@@ -6,8 +6,8 @@ use std::{
 use arena_interface::{
     competition::{
         msg::{
-            CompetitionsFilter, EscrowContractInfo, ExecuteBase, HookDirection, InstantiateBase,
-            QueryBase, ToCompetitionExt,
+            CompetitionsFilter, EscrowContractInfo, ExecuteBase, InstantiateBase, QueryBase,
+            ToCompetitionExt,
         },
         state::{
             Competition, CompetitionResponse, CompetitionStatus, Config, Evidence, TempCompetition,
@@ -17,7 +17,7 @@ use arena_interface::{
             StatValueType,
         },
     },
-    core::{CompetitionModuleResponse, ProposeMessage, TaxConfigurationResponse},
+    core::{ProposeMessage, TaxConfigurationResponse},
     fees::FeeInformation,
     group::GroupContractInfo,
     ratings::MemberResult,
@@ -85,7 +85,6 @@ pub struct CompetitionModuleContract<
     pub escrows_to_competitions: Map<'static, &'a Addr, u128>,
     pub temp_competition: Item<'static, TempCompetition<CompetitionInstantiateExt>>,
     pub temp_competition_id: Item<'static, u128>,
-    pub competition_hooks: Map<'static, (u128, &'a Addr), HookDirection>,
     pub stats: SnapshotMap<'static, (u128, &'a Addr, &'a str), StatValue>,
     pub stat_types: Map<'a, (u128, &'a str), StatType>,
 
@@ -122,7 +121,6 @@ impl<
         escrows_to_competitions_key: &'static str,
         temp_competition_key: &'static str,
         temp_competition_id_key: &'static str,
-        competition_hooks_key: &'static str,
         competition_evidence_key: &'static str,
         competition_evidence_count_key: &'static str,
         competition_result_key: &'static str,
@@ -144,7 +142,6 @@ impl<
             escrows_to_competitions: Map::new(escrows_to_competitions_key),
             temp_competition: Item::new(temp_competition_key),
             temp_competition_id: Item::new(temp_competition_id_key),
-            competition_hooks: Map::new(competition_hooks_key),
             competition_evidence: Map::new(competition_evidence_key),
             competition_evidence_count: Map::new(competition_evidence_count_key),
             competition_result: Map::new(competition_result_key),
@@ -224,7 +221,6 @@ impl<
             "escrows_to_competitions",
             "temp_competition",
             "temp_competition_id",
-            "competition_hooks",
             "competition_evidence",
             "competition_evidence_count",
             "competition_result",
@@ -344,12 +340,6 @@ impl<
                 competition_id: id,
                 evidence,
             } => self.execute_submit_evidence(deps, env, info, id, evidence),
-            ExecuteBase::AddCompetitionHook { competition_id } => {
-                self.execute_add_competition_hook(deps, info, competition_id)
-            }
-            ExecuteBase::RemoveCompetitionHook { competition_id } => {
-                self.execute_remove_competition_hook(deps, info, competition_id)
-            }
             ExecuteBase::MigrateEscrows {
                 start_after,
                 limit,
@@ -375,11 +365,7 @@ impl<
                 competition_id,
                 stats,
             } => self.execute_input_stats(deps, env, info, competition_id, stats),
-            ExecuteBase::ExecuteCompetitionHook {
-                competition_id: _,
-                distribution: _,
-            }
-            | ExecuteBase::Extension { .. } => Ok(Response::default()),
+            ExecuteBase::Extension { .. } => Ok(Response::default()),
         }
     }
 
@@ -473,95 +459,6 @@ impl<
             .add_attribute("action", "submit_evidence")
             .add_attribute("sender", info.sender.to_string())
             .add_attribute("evidence_count", evidence_id))
-    }
-
-    pub fn validate_execute_hook(
-        &self,
-        deps: DepsMut,
-        info: MessageInfo,
-        competition_id: Uint128,
-    ) -> Result<(), CompetitionError> {
-        // Validate hook
-        if HookDirection::Incoming
-            != self
-                .competition_hooks
-                .load(deps.storage, (competition_id.u128(), &info.sender))?
-        {
-            return Err(CompetitionError::Unauthorized {});
-        }
-
-        Ok(())
-    }
-
-    pub fn execute_add_competition_hook(
-        &self,
-        deps: DepsMut,
-        info: MessageInfo,
-        competition_id: Uint128,
-    ) -> Result<Response, CompetitionError> {
-        // Load competition using the ID
-        if !self.competitions.has(deps.storage, competition_id.u128()) {
-            return Err(CompetitionError::UnknownCompetitionId { id: competition_id });
-        };
-
-        // Assert sender is a registered, active competition module
-        let ownership = get_ownership(deps.storage)?;
-
-        if ownership.owner.is_none() {
-            return Err(CompetitionError::OwnershipError(
-                cw_ownable::OwnershipError::NoOwner,
-            ));
-        }
-
-        let competition_module: CompetitionModuleResponse<String> = deps.querier.query_wasm_smart(
-            ownership.owner.unwrap(),
-            &arena_interface::core::QueryMsg::QueryExtension {
-                msg: arena_interface::core::QueryExt::CompetitionModule {
-                    query: arena_interface::core::CompetitionModuleQuery::Addr(
-                        info.sender.to_string(),
-                    ),
-                },
-            },
-        )?;
-
-        if !competition_module.is_enabled {
-            return Err(CompetitionError::StdError(StdError::generic_err(
-                "Competition module is not enabled",
-            )));
-        }
-
-        // Add competition hook
-        self.competition_hooks.save(
-            deps.storage,
-            (competition_id.u128(), &info.sender),
-            &HookDirection::Outgoing,
-        )?;
-
-        Ok(Response::new()
-            .add_attribute("action", "add_competition_hook")
-            .add_attribute("competition_module", info.sender)
-            .add_attribute("id", competition_id.to_string()))
-    }
-
-    pub fn execute_remove_competition_hook(
-        &self,
-        deps: DepsMut,
-        info: MessageInfo,
-        competition_id: Uint128,
-    ) -> Result<Response, CompetitionError> {
-        // Load competition using the ID
-        if !self.competitions.has(deps.storage, competition_id.u128()) {
-            return Err(CompetitionError::UnknownCompetitionId { id: competition_id });
-        };
-
-        // Remove competition hook
-        self.competition_hooks
-            .remove(deps.storage, (competition_id.u128(), &info.sender));
-
-        Ok(Response::new()
-            .add_attribute("action", "add_competition_hook")
-            .add_attribute("competition_module", info.sender)
-            .add_attribute("id", competition_id.to_string()))
     }
 
     pub fn execute_activate_from_escrow(
@@ -991,28 +888,6 @@ impl<
         // Get a distribution for messaging
         let distribution_msg = distribution.as_ref().map(|x| x.into_unchecked());
 
-        // Prepare hooks
-        let hooks: Vec<(Addr, HookDirection)> = self
-            .competition_hooks
-            .prefix(competition.id.u128())
-            .range(deps.storage, None, None, cosmwasm_std::Order::Ascending)
-            .collect::<StdResult<_>>()?;
-        let msg_binary = to_json_binary(&ExecuteBase::ExecuteCompetitionHook::<Empty, Empty> {
-            competition_id: competition.id,
-            distribution: distribution_msg.clone(),
-        })?;
-        let mut msgs: Vec<SubMsg> = hooks
-            .iter()
-            .filter(|x| x.1 == HookDirection::Outgoing)
-            .map(|x| {
-                SubMsg::new(CosmosMsg::Wasm(WasmMsg::Execute {
-                    contract_addr: x.0.to_string(),
-                    msg: msg_binary.clone(),
-                    funds: vec![],
-                }))
-            })
-            .collect();
-
         // Handle distribution, tax, and fees
         // Get Arena Tax config
         let arena_tax_config =
@@ -1066,25 +941,20 @@ impl<
                 self.temp_competition_id
                     .save(deps.storage, &competition.id.u128())?;
 
-                msgs.push(sub_msg);
-
-                Ok(())
+                Ok(Response::new()
+                    .add_attribute("action", "process_competition")
+                    .add_attribute(
+                        "distribution",
+                        distribution
+                            .map(|some| some.to_string())
+                            .unwrap_or("None".to_owned()),
+                    )
+                    .add_submessage(sub_msg))
             }
             _ => Err(CompetitionError::InvalidCompetitionStatus {
                 current_status: competition.status.clone(),
             }),
-        }?;
-
-        // Tax info is displayed in the escrow response
-        Ok(Response::new()
-            .add_attribute("action", "process_competition")
-            .add_attribute(
-                "distribution",
-                distribution
-                    .map(|some| some.to_string())
-                    .unwrap_or("None".to_owned()),
-            )
-            .add_submessages(msgs))
+        }
     }
 
     // This method is meant to be called when the competition between 2 competitors is processed to trigger a rating adjustment on the arena core for the competition's category

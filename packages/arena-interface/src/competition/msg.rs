@@ -36,16 +36,6 @@ pub enum ExecuteBase<ExecuteExt, CompetitionInstantiateExt> {
         distribution: Option<Distribution<String>>,
     },
     ActivateCompetition {},
-    AddCompetitionHook {
-        competition_id: Uint128,
-    },
-    RemoveCompetitionHook {
-        competition_id: Uint128,
-    },
-    ExecuteCompetitionHook {
-        competition_id: Uint128,
-        distribution: Option<Distribution<String>>,
-    },
     CreateCompetition {
         /// The competition's host
         /// Defaults to info.sender
@@ -176,12 +166,6 @@ pub enum CompetitionsFilter {
     CompetitionStatus { status: CompetitionStatus },
     Category { id: Option<Uint128> },
     Host(String),
-}
-
-#[cw_serde]
-pub enum HookDirection {
-    Incoming,
-    Outgoing,
 }
 
 pub trait ToCompetitionExt<T> {
