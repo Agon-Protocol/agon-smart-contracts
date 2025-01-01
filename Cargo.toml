@@ -7,7 +7,7 @@ edition = "2021"
 license = "GPL-3.0-or-later"
 license-file = "LICENSE"
 repository = "https://github.com/Arena-DAO/arena-smart-contracts"
-version = "2.2.0"
+version = "2.3.0"
 
 [workspace.metadata]
 documentation = "https://docs.arenadao.org"
@@ -38,15 +38,14 @@ cw20 = "1.1.2"
 cw721 = "0.18.0"
 cw20-base = { version = "1.1.2", features = ["library"] }
 cw721-base = { version = "0.18", features = ["library"] }
-anyhow = "1.0.86"
+anyhow = "1.0.95"
 cw4-group = { version = "1.1.2", features = ["library"] }
-rand = "0.8.5"
 cw4 = "1.1.2"
 serde = { version = "1.0.209", default-features = false, features = ["derive"] }
 cw-paginate = "0.2.1"
 cw-ownable = "0.5.1"
 cw-address-like = "1.0.4"
-itertools = "0.13.0"
+itertools = "0.14.0"
 cw-orch = "0.24.1"
 semver = "1.0.23"
 rust_decimal = "1.36.0"
