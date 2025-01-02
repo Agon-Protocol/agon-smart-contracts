@@ -1634,6 +1634,29 @@
               }
             },
             "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "from_v2_2"
+            ],
+            "properties": {
+              "from_v2_2": {
+                "type": "object",
+                "required": [
+                  "escrow_id"
+                ],
+                "properties": {
+                  "escrow_id": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0.0
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
           }
         ]
       }

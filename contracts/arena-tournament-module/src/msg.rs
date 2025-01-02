@@ -134,7 +134,7 @@ impl ToCompetitionExt<TournamentExt> for TournamentInstantiateExt {
 
         Ok(TournamentExt {
             distribution: self.distribution.clone(),
-            elimination_type: self.elimination_type.clone(),
+            elimination_type: self.elimination_type,
             total_matches: total_matches.into(),
             processed_matches: Uint128::zero(),
         })

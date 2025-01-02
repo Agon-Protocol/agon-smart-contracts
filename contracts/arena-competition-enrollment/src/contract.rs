@@ -10,6 +10,7 @@ use cw2::{ensure_from_older_version, set_contract_version};
 
 use crate::{
     execute::{self, FINALIZE_COMPETITION_REPLY_ID},
+    migrate,
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
     query,
     state::{
@@ -110,9 +111,10 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     let _version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+    let mut msgs = vec![];
     match msg {
         MigrateMsg::FromCompatible {} => {}
         MigrateMsg::RemoveThirdPlaceMatch { enrollment_id } => {
@@ -144,10 +146,17 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, Co
                 },
             )?;
         }
+        MigrateMsg::FromV2_2 { escrow_id } => {
+            msgs.extend(migrate::migrate_from_v2_2_to_v2_3(
+                deps.branch(),
+                env,
+                escrow_id,
+            )?);
+        }
     };
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    Ok(Response::default())
+    Ok(Response::default().add_messages(msgs))
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

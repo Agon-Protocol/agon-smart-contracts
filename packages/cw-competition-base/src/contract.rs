@@ -1654,7 +1654,6 @@ impl<
         &self,
         deps: DepsMut,
         env: Env,
-        info: MessageInfo,
         escrow_id: u64,
     ) -> Result<Vec<CosmosMsg>, CompetitionError> {
         let mut msgs = vec![];
@@ -1668,7 +1667,8 @@ impl<
             let escrow = match competition.escrow {
                 Some(escrow) => escrow,
                 None => {
-                    let binding = format!("{}{}{}", info.sender, env.block.height, competition_id);
+                    let binding =
+                        format!("{}{}{}", "competition", env.block.height, competition_id);
                     let salt: [u8; 32] = Sha256::digest(binding.as_bytes()).into();
                     let canonical_creator =
                         deps.api.addr_canonicalize(env.contract.address.as_str())?;

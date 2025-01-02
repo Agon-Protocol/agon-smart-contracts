@@ -8,6 +8,7 @@ pub mod arena_tournament_module;
 pub mod arena_wager_module;
 mod deploy;
 mod helpers;
+pub mod migrations;
 
 pub(crate) const PREFIX: &str = "arena";
 pub(crate) const ADMIN: &str = "ismellike";

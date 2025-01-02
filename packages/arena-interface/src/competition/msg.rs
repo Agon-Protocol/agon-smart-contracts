@@ -146,6 +146,7 @@ where
 #[cw_serde]
 pub enum MigrateBase {
     FromCompatible {},
+    FromV2_2 { escrow_id: u64 },
 }
 
 #[cw_serde]

@@ -95,6 +95,7 @@ pub enum QueryMsg {
 pub enum MigrateMsg {
     FromCompatible {},
     RemoveThirdPlaceMatch { enrollment_id: Uint128 },
+    FromV2_2 { escrow_id: u64 },
 }
 
 #[cw_serde]

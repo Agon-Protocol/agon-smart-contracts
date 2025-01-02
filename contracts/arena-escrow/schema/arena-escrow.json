@@ -160,14 +160,38 @@
                     "type": "null"
                   }
                 ]
+              }
+            },
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      {
+        "type": "object",
+        "required": [
+          "enrollment_withdraw"
+        ],
+        "properties": {
+          "enrollment_withdraw": {
+            "type": "object",
+            "required": [
+              "addrs",
+              "entry_fee"
+            ],
+            "properties": {
+              "addrs": {
+                "description": "The recipients",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
               },
-              "enrollment_withdraw_info": {
-                "anyOf": [
+              "entry_fee": {
+                "description": "The enrollment entry fee",
+                "allOf": [
                   {
-                    "$ref": "#/definitions/EnrollmentWithdrawMsg"
-                  },
-                  {
-                    "type": "null"
+                    "$ref": "#/definitions/Coin"
                   }
                 ]
               }
@@ -235,6 +259,7 @@
                 "minimum": 0.0
               },
               "distribution": {
+                "description": "How the escrow funds will be distributed If none, the funds will be split evenly across members with the 1 seed receiving remainders",
                 "anyOf": [
                   {
                     "$ref": "#/definitions/Distribution_for_String"
@@ -440,31 +465,6 @@
           },
           "remainder_addr": {
             "type": "string"
-          }
-        },
-        "additionalProperties": false
-      },
-      "EnrollmentWithdrawMsg": {
-        "type": "object",
-        "required": [
-          "addrs",
-          "entry_fee"
-        ],
-        "properties": {
-          "addrs": {
-            "description": "The recipients",
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "entry_fee": {
-            "description": "The enrollment entry fee",
-            "allOf": [
-              {
-                "$ref": "#/definitions/Coin"
-              }
-            ]
           }
         },
         "additionalProperties": false

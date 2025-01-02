@@ -245,6 +245,7 @@ impl<Chain: CwEnv> cw_orch::contract::Deploy<Chain> for Arena<Chain> {
 
     fn load_from(chain: Chain) -> Result<Self, Self::Error> {
         let arena = Self::new(chain);
+
         Ok(arena)
     }
 
