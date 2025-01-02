@@ -10,7 +10,8 @@ use arena_interface::{
             ToCompetitionExt,
         },
         state::{
-            Competition, CompetitionResponse, CompetitionStatus, Config, Evidence, TempCompetition,
+            Competition, CompetitionResponse, CompetitionStatus, CompetitionV2_2, Config, Evidence,
+            TempCompetition,
         },
         stats::{
             MemberStatsMsg, StatAggregationType, StatMsg, StatTableEntry, StatType, StatValue,
@@ -18,6 +19,7 @@ use arena_interface::{
         },
     },
     core::{ProposeMessage, TaxConfigurationResponse},
+    escrow,
     fees::FeeInformation,
     group::GroupContractInfo,
     ratings::MemberResult,
@@ -78,6 +80,7 @@ pub struct CompetitionModuleContract<
         Competition<CompetitionExt>,
         CompetitionIndexes<'static, CompetitionExt>,
     >,
+    pub competitions_v2_2: Map<'static, u128, CompetitionV2_2<CompetitionExt>>,
     pub competition_evidence: Map<'static, (u128, u128), Evidence>,
     pub competition_evidence_count: Map<'static, u128, Uint128>,
     pub competition_result: Map<'static, u128, Option<Distribution<Addr>>>,
@@ -139,6 +142,7 @@ impl<
                 competitions_category_key,
                 competitions_host_key,
             ),
+            competitions_v2_2: Map::new(competitions_key),
             escrows_to_competitions: Map::new(escrows_to_competitions_key),
             temp_competition: Item::new(temp_competition_key),
             temp_competition_id: Item::new(temp_competition_id_key),
@@ -636,6 +640,7 @@ impl<
                 addr,
                 additional_layered_fees,
             } => {
+                let addr = deps.api.addr_validate(&addr)?;
                 let fees = additional_layered_fees
                     .map(|fees| {
                         fees.iter()
@@ -1640,6 +1645,76 @@ impl<
         }
 
         Ok(())
+    }
+
+    pub fn migrate_from_v2_2_to_v2_3(
+        &self,
+        deps: DepsMut,
+        env: Env,
+        info: MessageInfo,
+        escrow_id: u64,
+    ) -> Result<Vec<CosmosMsg>, CompetitionError> {
+        let mut msgs = vec![];
+        let code_info = deps.querier.query_wasm_code_info(escrow_id)?;
+
+        for (competition_id, competition) in self
+            .competitions_v2_2
+            .range(deps.storage, None, None, cosmwasm_std::Order::Descending)
+            .collect::<StdResult<Vec<_>>>()?
+        {
+            let escrow = match competition.escrow {
+                Some(escrow) => escrow,
+                None => {
+                    let binding = format!("{}{}{}", info.sender, env.block.height, competition_id);
+                    let salt: [u8; 32] = Sha256::digest(binding.as_bytes()).into();
+                    let canonical_creator =
+                        deps.api.addr_canonicalize(env.contract.address.as_str())?;
+                    let canonical_addr =
+                        instantiate2_address(&code_info.checksum, &canonical_creator, &salt)?;
+
+                    msgs.push(CosmosMsg::Wasm(WasmMsg::Instantiate2 {
+                        admin: Some(env.contract.address.to_string()),
+                        code_id: escrow_id,
+                        label: "Arena Escrow".to_string(),
+                        msg: to_json_binary(&escrow::InstantiateMsg {
+                            dues: vec![],
+                            is_enrollment: false,
+                        })?,
+                        funds: vec![],
+                        salt: salt.into(),
+                    }));
+
+                    deps.api.addr_humanize(&canonical_addr)?
+                }
+            };
+
+            let new_competition = Competition {
+                id: competition.id,
+                category_id: competition.category_id,
+                admin_dao: competition.admin_dao,
+                host: competition.host,
+                escrow,
+                name: competition.name,
+                description: competition.description,
+                start_height: competition.start_height,
+                expiration: competition.expiration,
+                rulesets: competition.rulesets,
+                status: competition.status,
+                extension: competition.extension,
+                fees: competition.fees,
+                banner: competition.banner,
+                group_contract: competition.group_contract,
+            };
+
+            self.competitions.replace(
+                deps.storage,
+                competition_id,
+                Some(&new_competition),
+                Some(&new_competition),
+            )?;
+        }
+
+        Ok(msgs)
     }
 
     fn reply_group_instantiate_reply(

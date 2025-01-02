@@ -1,5 +1,5 @@
 use arena_interface::competition::{
-    msg::{ExecuteBase, InstantiateBase, QueryBase, ToCompetitionExt},
+    msg::{ExecuteBase, InstantiateBase, MigrateBase, QueryBase, ToCompetitionExt},
     state::{Competition, CompetitionResponse},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
@@ -26,8 +26,9 @@ impl From<QueryExt> for QueryMsg {
 }
 
 #[cw_serde]
+#[serde(untagged)]
 pub enum MigrateMsg {
-    FromCompatible {},
+    Base(MigrateBase),
 }
 
 #[cw_serde]

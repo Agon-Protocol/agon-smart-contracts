@@ -1,7 +1,7 @@
 use crate::state::{LeagueExt, Match, MatchResult, PointAdjustment};
 use arena_interface::{
     competition::{
-        msg::{ExecuteBase, InstantiateBase, QueryBase, ToCompetitionExt},
+        msg::{ExecuteBase, InstantiateBase, MigrateBase, QueryBase, ToCompetitionExt},
         state::{Competition, CompetitionResponse},
     },
     group,
@@ -75,10 +75,10 @@ impl From<LeagueQueryExt> for QueryMsg {
 }
 
 #[cw_serde]
+#[serde(untagged)]
 pub enum MigrateMsg {
-    FromCompatible {},
+    Base(MigrateBase),
 }
-
 /// This is used to completely generate schema types
 /// QueryExt response types are hidden by the QueryBase mapping to Binary output
 #[cw_serde]

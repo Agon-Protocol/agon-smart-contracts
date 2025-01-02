@@ -52,9 +52,11 @@ pub fn enrollment_count(deps: Deps) -> StdResult<Uint128> {
 
 pub fn is_member(deps: Deps, enrollment_id: Uint128, addr: String) -> StdResult<bool> {
     let enrollment = enrollment_entries().load(deps.storage, enrollment_id.u128())?;
+    let group_contract = enrollment
+        .competition_info
+        .into_response(deps, &enrollment.competition_module)?
+        .group_contract;
 
-    deps.querier.query_wasm_smart::<bool>(
-        enrollment.group_contract,
-        &group::QueryMsg::IsMember { addr },
-    )
+    deps.querier
+        .query_wasm_smart::<bool>(group_contract, &group::QueryMsg::IsMember { addr })
 }

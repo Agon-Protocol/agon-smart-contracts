@@ -1,6 +1,6 @@
 use crate::{
     execute, migrate, query,
-    state::{self, DUE, INITIAL_DUE, IS_ENROLLMENT, IS_LOCKED},
+    state::{self, DUE, ENROLLMENT_CONTRACT, INITIAL_DUE, IS_LOCKED},
     ContractError,
 };
 use arena_interface::escrow::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
@@ -35,7 +35,9 @@ pub fn instantiate_contract(
 ) -> Result<(), ContractError> {
     cw_ownable::initialize_owner(deps.storage, deps.api, Some(info.sender.as_str()))?;
 
-    IS_ENROLLMENT.save(deps.storage, &is_enrollment)?;
+    if is_enrollment {
+        ENROLLMENT_CONTRACT.save(deps.storage, &info.sender)?;
+    }
     IS_LOCKED.save(deps.storage, &false)?;
     for member_balance in dues {
         let member_balance = member_balance.into_checked(deps.as_ref())?;

@@ -241,6 +241,9 @@ impl BalanceVerified {
         if multiplier.is_zero() {
             return Ok(Self::default());
         }
+        if multiplier == Decimal::one() {
+            return Ok(self.clone());
+        }
 
         let (native, cw20, cw721) = self.to_maps();
 

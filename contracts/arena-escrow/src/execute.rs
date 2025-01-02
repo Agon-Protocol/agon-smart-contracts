@@ -3,24 +3,24 @@ use std::iter;
 use arena_interface::{
     escrow::{EnrollmentWithdrawMsg, TransferEscrowOwnershipMsg},
     fees::FeeInformation,
-    group,
+    group::{self, MemberMsg},
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, DepsMut, Empty, MessageInfo, Order,
+    to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Decimal, DepsMut, Empty, MessageInfo,
     Response, StdError, StdResult, Uint128,
 };
 use cw20::{Cw20CoinVerified, Cw20ReceiveMsg};
 use cw721::Cw721ReceiveMsg;
 use cw_balance::{
-    BalanceError, BalanceVerified, Cw721CollectionVerified, Distribution, MemberBalanceChecked,
+    BalanceError, BalanceVerified, Cw721CollectionVerified, Distribution, MemberPercentage,
 };
 use cw_ownable::{assert_owner, get_ownership};
 
 use crate::{
     query::is_locked,
     state::{
-        is_fully_funded, BALANCE, DUE, HAS_DISTRIBUTED, INITIAL_DUE, IS_ENROLLMENT, IS_LOCKED,
-        TOTAL_BALANCE,
+        is_fully_funded, BALANCE, DUE, ENROLLMENT_CONTRACT, HAS_DISTRIBUTED, INITIAL_DUE,
+        IS_LOCKED, TOTAL_BALANCE,
     },
     ContractError,
 };
@@ -43,15 +43,8 @@ pub fn withdraw(
     // Load the total balance
     let mut total_balance = TOTAL_BALANCE.may_load(deps.storage)?.unwrap_or_default();
 
-    if IS_ENROLLMENT.may_load(deps.storage)?.unwrap_or_default() {
-        let ownership = get_ownership(deps.storage)?;
-
-        // Only the enrollment contract can trigger withdrawals
-        // This config is changed when the escrow is transferred to the competition modules
-        if ownership.owner.map_or(true, |x| x != info.sender) {
-            return Err(ContractError::EnrollmentWithdraw {});
-        }
-
+    // Only the enrollment contract can withdraw
+    if ENROLLMENT_CONTRACT.may_load(deps.storage)? == get_ownership(deps.storage)?.owner {
         match enrollment_withdraw_info {
             Some(EnrollmentWithdrawMsg { addrs, entry_fee }) => {
                 let addrs = addrs
@@ -298,58 +291,53 @@ pub fn distribute(
         }
     }
 
-    // Process distribution if provided
-    let distributed_amounts = if let Some(distribution) = distribution {
-        let distribution = distribution.into_checked(deps.as_ref())?;
-
-        // Validate distribution is valid
-        if !deps.querier.query_wasm_smart::<bool>(
+    // Create a distribution of all members if not provided
+    let distribution = distribution.unwrap_or({
+        let members: Vec<MemberMsg<String>> = deps.querier.query_wasm_smart(
             group_contract.to_string(),
-            &group::QueryMsg::IsValidDistribution {
-                addrs: distribution
-                    .member_percentages
-                    .iter()
-                    .map(|x| x.addr.to_string())
-                    .chain(iter::once(distribution.remainder_addr.to_string()))
-                    .collect(),
+            &group::QueryMsg::Members {
+                start_after: None,
+                limit: None,
             },
-        )? {
-            return Err(ContractError::InvalidDistribution {
-                msg: "The distribution must contain only members of the competition".to_string(),
-            });
+        )?;
+        let percentage = Decimal::from_ratio(1u128, members.len() as u128);
+        let remainder_addr = members[0].addr.clone();
+        Distribution {
+            member_percentages: members
+                .into_iter()
+                .map(|x| MemberPercentage {
+                    addr: x.addr,
+                    percentage,
+                })
+                .collect(),
+            remainder_addr,
         }
+    });
 
-        // Calculate the distribution amounts based on the total balance and distribution
-        let distributed_amounts = total_balance.split(&distribution)?;
+    let distribution = distribution.into_checked(deps.as_ref())?;
 
-        // Clear existing balance storage
-        BALANCE.clear(deps.storage);
+    // Validate distribution is valid
+    if !deps.querier.query_wasm_smart::<bool>(
+        group_contract.to_string(),
+        &group::QueryMsg::IsValidDistribution {
+            addrs: distribution
+                .member_percentages
+                .iter()
+                .map(|x| x.addr.to_string())
+                .chain(iter::once(distribution.remainder_addr.to_string()))
+                .collect(),
+        },
+    )? {
+        return Err(ContractError::InvalidDistribution {
+            msg: "The distribution must contain only members of the competition".to_string(),
+        });
+    }
 
-        distributed_amounts
-    } else {
-        let mut distributed_amounts = vec![];
-        for (addr, balance) in BALANCE
-            .range(deps.storage, None, None, Order::Ascending)
-            .collect::<StdResult<Vec<_>>>()?
-        {
-            let mut new_balance = balance.clone();
-            if let Some(layered_fees) = layered_fees.as_ref() {
-                for fee in layered_fees {
-                    new_balance = balance.checked_sub(&balance.checked_mul_floor(fee.tax)?)?;
-                }
-            }
+    // Calculate the distribution amounts based on the total balance and distribution
+    let distributed_amounts = total_balance.split(&distribution)?;
 
-            distributed_amounts.push(MemberBalanceChecked {
-                addr,
-                balance: new_balance,
-            });
-        }
-
-        // Clear existing balance storage
-        BALANCE.clear(deps.storage);
-
-        distributed_amounts
-    };
+    // Clear existing balance storage
+    BALANCE.clear(deps.storage);
 
     // Query payment registry
     let payment_registry: Option<String> = deps.querier.query_wasm_smart(
@@ -438,8 +426,6 @@ pub fn lock(
     if let Some(new_ownership) = transfer_ownership {
         let ownership =
             cw_ownable::initialize_owner(deps.storage, deps.api, Some(&new_ownership.addr))?;
-        // Assume a transfership means we're moving from enrollment contract to
-        IS_ENROLLMENT.save(deps.storage, &new_ownership.is_enrollment)?;
         res = res.add_attributes(ownership.into_attributes());
     }
 

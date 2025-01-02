@@ -213,9 +213,21 @@ pub fn reply(deps: DepsMut, _env: Env, msg: Reply) -> Result<Response, ContractE
                         )))
                     }
                 }
-                SubMsgResult::Err(error_message) => Ok(Response::new()
-                    .add_attribute("reply", "reply_finalize")
-                    .add_attribute("error", error_message)),
+                SubMsgResult::Err(error_message) => {
+                    let escrow_msg = WasmMsg::Execute {
+                        contract_addr: enrollment_info.escrow_addr.to_string(),
+                        msg: to_json_binary(&escrow::ExecuteMsg::Lock {
+                            value: false,
+                            transfer_ownership: None,
+                        })?,
+                        funds: vec![],
+                    };
+
+                    Ok(Response::new()
+                        .add_attribute("reply", "reply_finalize")
+                        .add_attribute("error", error_message)
+                        .add_message(escrow_msg))
+                }
             }
         }
         _ => Err(ContractError::UnknownReplyId { id: msg.id }),

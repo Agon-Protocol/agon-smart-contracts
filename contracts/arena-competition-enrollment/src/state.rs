@@ -14,7 +14,7 @@ pub struct LegacyEnrollmentEntry {
     pub entry_fee: Option<Coin>,
     pub expiration: Expiration,
     pub has_triggered_expiration: bool,
-    pub competition_info: CompetitionInfo,
+    pub competition_info: LegacyCompetitionInfo,
     pub competition_type: CompetitionType,
     pub host: Addr,
     pub category_id: Option<Uint128>,
@@ -35,9 +35,7 @@ pub struct EnrollmentEntry {
     pub host: Addr,
     pub category_id: Option<Uint128>,
     pub competition_module: Addr,
-    pub group_contract: Addr,
     pub required_team_size: Option<u32>,
-    pub escrow: Addr,
 }
 
 #[cw_serde]
@@ -55,21 +53,21 @@ pub struct EnrollmentEntryResponse {
     pub host: Addr,
     pub is_expired: bool,
     pub competition_module: Addr,
-    pub group_contract: Addr,
     pub require_team_size: Option<u32>,
-    pub escrow: Addr,
 }
 
 #[cw_serde]
 pub struct CompetitionInfoResponse {
-    name: String,
-    description: String,
-    expiration: Expiration,
-    rules: Option<Vec<String>>,
-    rulesets: Option<Vec<Uint128>>,
-    banner: Option<String>,
-    additional_layered_fees: Option<Vec<FeeInformation<Addr>>>,
-    competition_id: Option<Uint128>,
+    pub name: String,
+    pub description: String,
+    pub expiration: Expiration,
+    pub rules: Option<Vec<String>>,
+    pub rulesets: Option<Vec<Uint128>>,
+    pub banner: Option<String>,
+    pub additional_layered_fees: Option<Vec<FeeInformation<Addr>>>,
+    pub competition_id: Option<Uint128>,
+    pub escrow: Addr,
+    pub group_contract: Addr,
 }
 
 impl EnrollmentEntry {
@@ -79,8 +77,11 @@ impl EnrollmentEntry {
         block: &BlockInfo,
         id: Uint128,
     ) -> StdResult<EnrollmentEntryResponse> {
+        let competition_info = self
+            .competition_info
+            .into_response(deps, &self.competition_module)?;
         let current_members: Uint64 = deps.querier.query_wasm_smart(
-            self.group_contract.to_string(),
+            competition_info.group_contract.to_string(),
             &group::QueryMsg::MembersCount {},
         )?;
         let is_expired = self.expiration.is_expired(block);
@@ -94,16 +95,12 @@ impl EnrollmentEntry {
             entry_fee: self.entry_fee,
             expiration: self.expiration,
             has_finalized: self.has_finalized,
-            competition_info: self
-                .competition_info
-                .into_response(deps, &self.competition_module)?,
+            competition_info,
             competition_type: self.competition_type,
             host: self.host,
             is_expired,
             competition_module: self.competition_module,
-            group_contract: self.group_contract,
             require_team_size: self.required_team_size,
-            escrow: self.escrow,
         })
     }
 }
@@ -135,6 +132,22 @@ impl fmt::Display for CompetitionType {
 }
 
 #[cw_serde]
+pub enum LegacyCompetitionInfo {
+    Pending {
+        name: String,
+        description: String,
+        expiration: Expiration,
+        rules: Option<Vec<String>>,
+        rulesets: Option<Vec<Uint128>>,
+        banner: Option<String>,
+        additional_layered_fees: Option<Vec<FeeInformation<Addr>>>,
+    },
+    Existing {
+        id: Uint128,
+    },
+}
+
+#[cw_serde]
 pub enum CompetitionInfo {
     Pending {
         name: String,
@@ -144,6 +157,8 @@ pub enum CompetitionInfo {
         rulesets: Option<Vec<Uint128>>,
         banner: Option<String>,
         additional_layered_fees: Option<Vec<FeeInformation<Addr>>>,
+        escrow: Addr,
+        group_contract: Addr,
     },
     Existing {
         id: Uint128,
@@ -165,6 +180,8 @@ impl CompetitionInfo {
                 rulesets,
                 banner,
                 additional_layered_fees,
+                group_contract,
+                escrow,
             } => CompetitionInfoResponse {
                 name,
                 description,
@@ -174,6 +191,8 @@ impl CompetitionInfo {
                 banner,
                 additional_layered_fees,
                 competition_id: None,
+                escrow,
+                group_contract,
             },
             CompetitionInfo::Existing { id } => {
                 let competition = deps
@@ -198,6 +217,8 @@ impl CompetitionInfo {
                     expiration: competition.expiration,
                     additional_layered_fees: competition.fees,
                     competition_id: Some(id),
+                    escrow: competition.escrow,
+                    group_contract: competition.group_contract,
                 }
             }
         })

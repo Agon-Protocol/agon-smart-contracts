@@ -144,9 +144,14 @@ where
 }
 
 #[cw_serde]
+pub enum MigrateBase {
+    FromCompatible {},
+}
+
+#[cw_serde]
 pub enum EscrowContractInfo {
     Existing {
-        addr: Addr,
+        addr: String,
         additional_layered_fees: Option<Vec<FeeInformation<String>>>,
     },
     New {

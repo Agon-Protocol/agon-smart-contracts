@@ -1,4 +1,4 @@
-use arena_interface::competition::msg::{ExecuteBase, QueryBase};
+use arena_interface::competition::msg::{ExecuteBase, MigrateBase, QueryBase};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -148,11 +148,13 @@ pub fn migrate(mut deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response
     let version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
     match msg {
-        MigrateMsg::FromCompatible {} => {
-            if version.major == 1 && version.minor < 7 {
-                competition_module.migrate_from_v1_6_to_v1_7(deps.branch())?;
+        MigrateMsg::Base(migrate_base) => match migrate_base {
+            MigrateBase::FromCompatible {} => {
+                if version.major == 1 && version.minor < 7 {
+                    competition_module.migrate_from_v1_6_to_v1_7(deps.branch())?;
+                }
             }
-        }
+        },
     }
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
     Ok(Response::default())

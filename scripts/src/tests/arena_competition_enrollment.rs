@@ -119,7 +119,7 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
     // Set group contract
     arena
         .arena_group
-        .set_address(&enrollments[0].group_contract);
+        .set_address(&enrollments[0].competition_info.group_contract);
 
     // Enroll a member
     arena.arena_competition_enrollment.set_sender(&teams[0]);
@@ -486,7 +486,9 @@ fn test_successful_wager_creation() -> anyhow::Result<()> {
     let enrollment = arena
         .arena_competition_enrollment
         .enrollment(Uint128::one())?;
-    arena.arena_escrow.set_address(&enrollment.escrow);
+    arena
+        .arena_escrow
+        .set_address(&enrollment.competition_info.escrow);
     // 5% platform fee of 2000
     let balance = mock.query_balance(&arena.dao_dao.dao_core.address()?, DENOM)?;
     assert_eq!(balance, Uint128::new(100));
@@ -886,7 +888,9 @@ fn test_huge_tournament() -> anyhow::Result<()> {
     let enrollment = arena
         .arena_competition_enrollment
         .enrollment(Uint128::one())?;
-    arena.arena_escrow.set_address(&enrollment.escrow);
+    arena
+        .arena_escrow
+        .set_address(&enrollment.competition_info.escrow);
 
     // Donate 5000
     arena
