@@ -34,6 +34,8 @@ pub enum ExecuteMsg {
     Receive(Cw20ReceiveMsg),
     ReceiveNft(Cw721ReceiveMsg),
     Distribute {
+        /// How the escrow funds will be distributed
+        /// If none, the funds will be split evenly across members with the 1 seed receiving remainders
         distribution: Option<Distribution<String>>,
         /// Layered fees is an ordered list of fees to be applied before the distribution.
         /// The term layered refers to the implementation: Arena Tax -> Host Fee? -> Other Fee?
