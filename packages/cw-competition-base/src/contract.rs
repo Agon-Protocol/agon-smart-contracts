@@ -430,7 +430,10 @@ impl<
             .load(deps.storage, competition_id.u128())?;
 
         // Validate that competition is jailed
-        if !matches!(competition.status, CompetitionStatus::Jailed { .. }) {
+        if !matches!(
+            competition.status,
+            CompetitionStatus::Jailed { .. } | CompetitionStatus::Active { .. }
+        ) {
             return Err(CompetitionError::InvalidCompetitionStatus {
                 current_status: competition.status,
             });
