@@ -132,13 +132,14 @@ fn deploy_to_network(network: Network, component: &DeployComponent) -> anyhow::R
     match component {
         DeployComponent::All => {
             deploy_core(&daemon)?;
-            deploy_dao_core(&daemon)?;
             deploy_tournament(&daemon)?;
             deploy_enrollment(&daemon)?;
             deploy_token_gateway(&daemon)?;
             deploy_competition_modules(&daemon)?;
             deploy_group(&daemon)?;
-            deploy_identity(&daemon)?;
+            if matches!(network, Network::Mainnet) {
+                deploy_identity(&daemon)?;
+            }
             deploy_registry(&daemon)?;
             deploy_escrow(&daemon)?;
         }

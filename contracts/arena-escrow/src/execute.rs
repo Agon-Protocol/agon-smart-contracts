@@ -278,7 +278,7 @@ pub fn distribute(
     let group_contract = deps.api.addr_validate(&group_contract)?;
 
     // Load the total balance available for distribution
-    let mut total_balance = TOTAL_BALANCE.load(deps.storage)?;
+    let mut total_balance = TOTAL_BALANCE.may_load(deps.storage)?.unwrap_or_default();
 
     let mut msgs = vec![];
     let mut attrs = vec![];

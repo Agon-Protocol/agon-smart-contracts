@@ -2,11 +2,12 @@ use arena_competition_enrollment::msg::{
     CompetitionInfoMsg, ExecuteMsg, ExecuteMsgFns as _, MigrateMsg, QueryMsgFns as _,
 };
 use arena_competition_enrollment::state::CompetitionType;
-use arena_interface::competition::msg::{EscrowContractInfo, ExecuteBaseFns as _};
+use arena_interface::competition::msg::{EscrowContractInfo, ExecuteBaseFns as _, QueryBaseFns};
 use arena_interface::escrow::{self, ExecuteMsgFns as _, QueryMsgFns as _};
 use arena_interface::fees::FeeInformation;
 use arena_interface::group::{self, QueryMsgFns as _};
-use arena_tournament_module::state::EliminationType;
+use arena_tournament_module::msg::{ExecuteExtFns, MatchResultMsg};
+use arena_tournament_module::state::{EliminationType, MatchResult};
 use cosmwasm_std::{coin, coins, to_json_binary, CosmosMsg, Decimal, Uint128, Uint64, WasmMsg};
 use cw_balance::{BalanceVerified, Distribution, MemberPercentage};
 use cw_orch::{anyhow, prelude::*};
@@ -305,14 +306,14 @@ fn test_enrollment_capacity() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_successful_tournament_creation() -> anyhow::Result<()> {
+fn test_tournament() -> anyhow::Result<()> {
     let mock = MockBech32::new(PREFIX);
     let (mut arena, admin) = setup_arena(&mock)?;
 
     // Set teams
     let mut teams = vec![];
-    for i in 0..8 {
-        teams.push(mock.addr_make_with_balance(format!("team {}", i), coins(100_000u128, DENOM))?);
+    for i in 0..4 {
+        teams.push(mock.addr_make(format!("team {}", i)));
     }
 
     // Register the enrollment module
@@ -323,7 +324,7 @@ fn test_successful_tournament_creation() -> anyhow::Result<()> {
     let create_enrollment_msg = ExecuteMsg::CreateEnrollment {
         min_members: Some(Uint64::new(4)),
         max_members: Uint64::new(8),
-        entry_fee: Some(coins(1000, DENOM)[0].clone()),
+        entry_fee: None,
         expiration: Expiration::AtHeight(1000000),
         category_id: Some(Uint128::new(1)),
         competition_info: CompetitionInfoMsg {
@@ -355,12 +356,12 @@ fn test_successful_tournament_creation() -> anyhow::Result<()> {
         .arena_competition_enrollment
         .execute(&create_enrollment_msg, None)?;
 
-    // Enroll 8 members
+    // Enroll 4 members
     for team in &teams {
         arena.arena_competition_enrollment.set_sender(team);
         arena
             .arena_competition_enrollment
-            .enroll(Uint128::one(), None, &coins(1000, DENOM))?;
+            .enroll(Uint128::one(), None, &[])?;
     }
 
     // Trigger expiration
@@ -379,11 +380,41 @@ fn test_successful_tournament_creation() -> anyhow::Result<()> {
             .iter()
             .any(|attr| attr.key == "result" && attr.value == "competition_created")));
 
+    arena
+        .arena_tournament_module
+        .call_as(&admin)
+        .process_match(
+            vec![
+                MatchResultMsg {
+                    match_number: Uint128::one(),
+                    match_result: MatchResult::Team1,
+                },
+                MatchResultMsg {
+                    match_number: Uint128::new(2),
+                    match_result: MatchResult::Team1,
+                },
+            ],
+            Uint128::one(),
+        )?;
+    arena
+        .arena_tournament_module
+        .call_as(&admin)
+        .process_match(
+            vec![MatchResultMsg {
+                match_number: Uint128::new(3),
+                match_result: MatchResult::Team1,
+            }],
+            Uint128::one(),
+        )?;
+
+    let result = arena.arena_tournament_module.result(1u128)?;
+    assert!(result.is_some());
+
     Ok(())
 }
 
 #[test]
-fn test_successful_wager_creation() -> anyhow::Result<()> {
+fn test_wager() -> anyhow::Result<()> {
     let mock = MockBech32::new(PREFIX);
     let (mut arena, admin) = setup_arena(&mock)?;
 
