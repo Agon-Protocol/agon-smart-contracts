@@ -1,4 +1,3 @@
-use arena_competition_enrollment::msg::QueryMsgFns as _;
 use arena_interface::competition::msg::MigrateBase;
 use cw_orch::{anyhow, prelude::*};
 use cw_orch_clone_testing::CloneTesting;
@@ -42,11 +41,6 @@ fn test_migration_v2_2_v2_3() -> anyhow::Result<()> {
             arena.arena_competition_enrollment.code_id()?,
         )?;
     app.next_block()?;
-
-    let enrollments = arena
-        .arena_competition_enrollment
-        .enrollments(None, None, None)?;
-    dbg!(enrollments);
 
     Ok(())
 }
