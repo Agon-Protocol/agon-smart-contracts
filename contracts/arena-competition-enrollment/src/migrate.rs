@@ -21,7 +21,7 @@ pub fn migrate_from_v2_2_to_v2_3(
     let code_info = deps.querier.query_wasm_code_info(escrow_id)?;
 
     for (enrollment_id, enrollment) in LEGACY_ENROLLMENTS
-        .range(deps.storage, None, None, Order::Descending)
+        .range(deps.storage, None, None, Order::Ascending)
         .collect::<StdResult<Vec<_>>>()?
     {
         let competition_info = match enrollment.competition_info {

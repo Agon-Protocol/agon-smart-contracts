@@ -250,7 +250,14 @@ impl<Chain: CwEnv> cw_orch::contract::Deploy<Chain> for Arena<Chain> {
     }
 
     fn deployed_state_file_path() -> Option<String> {
-        None
+        let crate_path = env!("CARGO_MANIFEST_DIR");
+
+        Some(
+            std::path::PathBuf::from(crate_path)
+                .join("state.json")
+                .display()
+                .to_string(),
+        )
     }
 
     fn get_contracts_mut(

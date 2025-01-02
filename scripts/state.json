@@ -26,7 +26,6 @@
         "arena_token_gateway": "neutron15v7gqer0r3c20nlr5s46sfgzepk3z3k7y03605jtvkgn3rjua2gqh2lzaf",
         "arena_tournament_module": "neutron1yfsr8h06eg6dyglqp6ls02ah4u2z5gt7fm5khuy98tzmnrw2vu6s7hp8qg",
         "arena_wager_module": "neutron1kqn38z9m8tff858eynszc2p2ftqyln0fpxe5kkm3al784fuytr5qurhzru",
-        "cw_abc": "neutron1u0z6pgkh8t78q5kpjhclk72946d4rfn2h8qypwqvztatm9c0pfps4xsav5",
         "dao_dao_core": "neutron1r6n0effjs6wv0pdcq2wk7nwn4qmahsqvvu9lnj08hhw8pzt9t0lsr8rccf"
       }
     },
@@ -49,14 +48,12 @@
       "default": {
         "arena_competition_enrollment": "neutron16gtf438zpdu09zft6wdttcg5x648xwv88ljfw3gxgr4rjmfxlrdq7n4sxy",
         "arena_core": "neutron1m94yvyqdexyw5ydvdv5txwu72tl08hr5gvn53u87y08jhchr3w0q4vseca",
-        "arena_escrow": "neutron1rjchvdxmrz3tny5wffm0ekk9672gv8f0pvkk3taxa23d2lyyzh5qt3w2e2",
         "arena_group": "neutron1pzh32kr9r4gl0fcgrp69f4us2he5zysfzta096lg932fu6qr4s6srk8atv",
-        "arena_league_module": "neutron1yx4q5esj6mkt9chuex6wgym8pvcqq2n8dj5w9xhhklf3nps9xfesz4lyef",
-        "arena_payment_registry": "neutron1trp2yfy9meae6nkux7dp8mwkf5ztks3gpkdjqv0xewevqvspktrsgztphp",
-        "arena_token_gateway": "neutron16nl0tcwt9qujavdakft7ddyw4pwzh5nuzn35tke9m4yfu462z99q6yj66n",
-        "arena_tournament_module": "neutron1ehkcl0n6s2jtdw75xsvfxm304mz4hs5z7jt6wn5mk0celpj0epqql4ulxk",
-        "arena_wager_module": "neutron1xnx5vjy8medmlm4rgejp9l8sm2pae50hfpeezxt7tvgu28hca8vq832x4y",
-        "cw_abc": "neutron1yx4q5esj6mkt9chuex6wgym8pvcqq2n8dj5w9xhhklf3nps9xfesz4lyef",
+        "arena_league_module": "neutron1pzh32kr9r4gl0fcgrp69f4us2he5zysfzta096lg932fu6qr4s6srk8atv",
+        "arena_payment_registry": "neutron1rjchvdxmrz3tny5wffm0ekk9672gv8f0pvkk3taxa23d2lyyzh5qt3w2e2",
+        "arena_token_gateway": "neutron1yx4q5esj6mkt9chuex6wgym8pvcqq2n8dj5w9xhhklf3nps9xfesz4lyef",
+        "arena_tournament_module": "neutron1trp2yfy9meae6nkux7dp8mwkf5ztks3gpkdjqv0xewevqvspktrsgztphp",
+        "arena_wager_module": "neutron16nl0tcwt9qujavdakft7ddyw4pwzh5nuzn35tke9m4yfu462z99q6yj66n",
         "dao_dao_core": "neutron1ehkcl0n6s2jtdw75xsvfxm304mz4hs5z7jt6wn5mk0celpj0epqql4ulxk"
       }
     }
