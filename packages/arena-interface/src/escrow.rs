@@ -22,7 +22,12 @@ pub enum ExecuteMsg {
     Withdraw {
         cw20_msg: Option<Binary>,
         cw721_msg: Option<Binary>,
-        enrollment_withdraw_info: Option<EnrollmentWithdrawMsg>,
+    },
+    EnrollmentWithdraw {
+        /// The recipients
+        addrs: Vec<String>,
+        /// The enrollment entry fee
+        entry_fee: Coin,
     },
     #[cw_orch(payable)]
     ReceiveNative {},
@@ -90,14 +95,6 @@ pub struct DumpStateResponse {
 pub struct TransferEscrowOwnershipMsg {
     pub addr: String,
     pub is_enrollment: bool,
-}
-
-#[cw_serde]
-pub struct EnrollmentWithdrawMsg {
-    /// The recipients
-    pub addrs: Vec<String>,
-    /// The enrollment entry fee
-    pub entry_fee: Coin,
 }
 
 #[cw_serde]

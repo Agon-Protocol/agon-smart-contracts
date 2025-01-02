@@ -1,7 +1,7 @@
 use arena_interface::{
     competition::msg::EscrowContractInfo,
     core::{CompetitionModuleQuery, CompetitionModuleResponse},
-    escrow::{self, EnrollmentWithdrawMsg},
+    escrow::{self},
     fees::FeeInformation,
     group::{self, GroupContractInfo, MemberMsg},
 };
@@ -639,13 +639,9 @@ pub fn _withdraw(
     let mut msgs = if let Some(entry_fee) = &enrollment.entry_fee {
         vec![CosmosMsg::Wasm(WasmMsg::Execute {
             contract_addr: escrow.to_string(),
-            msg: to_json_binary(&escrow::ExecuteMsg::Withdraw {
-                cw20_msg: None,
-                cw721_msg: None,
-                enrollment_withdraw_info: Some(EnrollmentWithdrawMsg {
-                    addrs: members.clone(),
-                    entry_fee: entry_fee.clone(),
-                }),
+            msg: to_json_binary(&escrow::ExecuteMsg::EnrollmentWithdraw {
+                addrs: members.clone(),
+                entry_fee: entry_fee.clone(),
             })?,
             funds: vec![],
         })]

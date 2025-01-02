@@ -203,10 +203,7 @@ fn test_process_wager() -> anyhow::Result<()> {
     assert!(result.is_some());
 
     // Withdraw
-    arena
-        .arena_escrow
-        .call_as(&user1)
-        .withdraw(None, None, None)?;
+    arena.arena_escrow.call_as(&user1).withdraw(None, None)?;
 
     // Check balances
     let user1_balance = mock.query_balance(&user1, DENOM)?;
@@ -403,10 +400,7 @@ fn test_wager_with_additional_fees() -> anyhow::Result<()> {
     )?;
 
     // Withdraw
-    arena
-        .arena_escrow
-        .call_as(&user1)
-        .withdraw(None, None, None)?;
+    arena.arena_escrow.call_as(&user1).withdraw(None, None)?;
 
     // Check balances
     let user1_balance = mock.query_balance(&user1, DENOM)?;

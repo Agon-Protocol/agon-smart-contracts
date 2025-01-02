@@ -69,8 +69,10 @@ pub fn execute(
         ExecuteMsg::Withdraw {
             cw20_msg,
             cw721_msg,
-            enrollment_withdraw_info,
-        } => execute::withdraw(deps, info, cw20_msg, cw721_msg, enrollment_withdraw_info),
+        } => execute::withdraw(deps, info, cw20_msg, cw721_msg),
+        ExecuteMsg::EnrollmentWithdraw { addrs, entry_fee } => {
+            execute::enrollment_withdraw(deps, info, addrs, entry_fee)
+        }
         ExecuteMsg::Receive(cw20_receive_msg) => {
             execute::receive_cw20(deps, info, cw20_receive_msg)
         }

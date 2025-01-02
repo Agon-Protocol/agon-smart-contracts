@@ -1,13 +1,13 @@
 use std::iter;
 
 use arena_interface::{
-    escrow::{EnrollmentWithdrawMsg, TransferEscrowOwnershipMsg},
+    escrow::TransferEscrowOwnershipMsg,
     fees::FeeInformation,
     group::{self, MemberMsg},
 };
 use cosmwasm_std::{
-    to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Decimal, DepsMut, Empty, MessageInfo,
-    Response, StdError, StdResult, Uint128,
+    ensure, to_json_binary, Addr, BankMsg, Binary, Coin, CosmosMsg, Decimal, DepsMut, Empty,
+    MessageInfo, Response, StdResult, Uint128,
 };
 use cw20::{Cw20CoinVerified, Cw20ReceiveMsg};
 use cw721::Cw721ReceiveMsg;
@@ -25,12 +25,80 @@ use crate::{
     ContractError,
 };
 
+pub fn enrollment_withdraw(
+    deps: DepsMut,
+    info: MessageInfo,
+    addrs: Vec<String>,
+    entry_fee: Coin,
+) -> Result<Response, ContractError> {
+    if is_locked(deps.as_ref()) {
+        return Err(ContractError::Locked {});
+    }
+    ensure!(
+        ENROLLMENT_CONTRACT.exists(deps.storage),
+        ContractError::Unauthorized {}
+    );
+    ensure!(
+        ENROLLMENT_CONTRACT.may_load(deps.storage)? == get_ownership(deps.storage)?.owner,
+        ContractError::Unauthorized {}
+    );
+
+    let mut balance = BALANCE.load(deps.storage, &info.sender)?;
+    let mut total_balance = TOTAL_BALANCE.may_load(deps.storage)?.unwrap_or_default();
+
+    let mut msgs = vec![];
+
+    let addrs = addrs
+        .into_iter()
+        .map(|addr| {
+            let validated_addr = deps.api.addr_validate(&addr)?; // Validate the address
+
+            // Create and push the message for this address
+            msgs.push(CosmosMsg::Bank(BankMsg::Send {
+                to_address: validated_addr.to_string(),
+                amount: vec![entry_fee.clone()],
+            }));
+
+            Ok(validated_addr) // Return the validated address
+        })
+        .collect::<StdResult<Vec<_>>>()?;
+
+    // Deduct the full entry fee balance
+    let full_entry_fee_balance = BalanceVerified {
+        native: Some(vec![Coin {
+            denom: entry_fee.denom.clone(),
+            amount: entry_fee
+                .amount
+                .checked_mul(Uint128::new(addrs.len() as u128))?,
+        }]),
+        cw20: None,
+        cw721: None,
+    };
+    balance = balance.checked_sub(&full_entry_fee_balance)?;
+    total_balance = total_balance.checked_sub(&full_entry_fee_balance)?;
+
+    // Save balance
+    if balance.is_empty() {
+        BALANCE.remove(deps.storage, &info.sender);
+    } else {
+        BALANCE.save(deps.storage, &info.sender, &balance)?;
+    }
+    if total_balance.is_empty() {
+        TOTAL_BALANCE.remove(deps.storage);
+    } else {
+        TOTAL_BALANCE.save(deps.storage, &total_balance)?;
+    }
+
+    Ok(Response::new()
+        .add_attribute("action", "enrollment_withdraw")
+        .add_messages(msgs))
+}
+
 pub fn withdraw(
     deps: DepsMut,
     info: MessageInfo,
     cw20_msg: Option<Binary>,
     cw721_msg: Option<Binary>,
-    enrollment_withdraw_info: Option<EnrollmentWithdrawMsg>,
 ) -> Result<Response, ContractError> {
     if is_locked(deps.as_ref()) {
         return Err(ContractError::Locked {});
@@ -38,58 +106,12 @@ pub fn withdraw(
 
     let mut msgs = vec![];
     // Load entire user balance
-    let mut balance = BALANCE.load(deps.storage, &info.sender)?;
+    let balance = BALANCE.load(deps.storage, &info.sender)?;
 
     // Load the total balance
     let mut total_balance = TOTAL_BALANCE.may_load(deps.storage)?.unwrap_or_default();
 
-    // Only the enrollment contract can withdraw
-    if ENROLLMENT_CONTRACT.may_load(deps.storage)? == get_ownership(deps.storage)?.owner {
-        match enrollment_withdraw_info {
-            Some(EnrollmentWithdrawMsg { addrs, entry_fee }) => {
-                let addrs = addrs
-                    .into_iter()
-                    .map(|addr| {
-                        let validated_addr = deps.api.addr_validate(&addr)?; // Validate the address
-
-                        // Create and push the message for this address
-                        msgs.push(CosmosMsg::Bank(BankMsg::Send {
-                            to_address: validated_addr.to_string(),
-                            amount: vec![entry_fee.clone()],
-                        }));
-
-                        Ok(validated_addr) // Return the validated address
-                    })
-                    .collect::<StdResult<Vec<_>>>()?;
-
-                // Deduct the full entry fee balance
-                let full_entry_fee_balance = BalanceVerified {
-                    native: Some(vec![Coin {
-                        denom: entry_fee.denom.clone(),
-                        amount: entry_fee
-                            .amount
-                            .checked_mul(Uint128::new(addrs.len() as u128))?,
-                    }]),
-                    cw20: None,
-                    cw721: None,
-                };
-                balance = balance.checked_sub(&full_entry_fee_balance)?;
-                total_balance = total_balance.checked_sub(&full_entry_fee_balance)?;
-
-                // Save balance
-                if balance.is_empty() {
-                    BALANCE.remove(deps.storage, &info.sender);
-                } else {
-                    BALANCE.save(deps.storage, &info.sender, &balance)?;
-                }
-            }
-            None => {
-                return Err(ContractError::StdError(StdError::generic_err(
-                    "Enrollment withdraw msg is required when configured for enrollment contracts",
-                )))
-            }
-        };
-    } else if balance.is_empty() {
+    if balance.is_empty() {
         BALANCE.remove(deps.storage, &info.sender);
     } else {
         // Update total balance and related storage entries

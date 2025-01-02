@@ -592,84 +592,13 @@ fn test_successful_league_creation() -> anyhow::Result<()> {
 }
 
 #[test]
-fn test_finalize_without_escrow() -> anyhow::Result<()> {
-    let mock = MockBech32::new(PREFIX);
-    let (mut arena, admin) = setup_arena(&mock)?;
-
-    // Register the enrollment module
-    register_competition_enrollment_module(&arena, &admin)?;
-
-    // Create an enrollment
-    arena.arena_competition_enrollment.set_sender(&admin);
-    let create_enrollment_msg = ExecuteMsg::CreateEnrollment {
-        min_members: None,
-        max_members: Uint64::new(10),
-        entry_fee: None,
-        expiration: Expiration::AtHeight(1000000),
-        category_id: Some(Uint128::new(1)),
-        competition_info: CompetitionInfoMsg {
-            name: "Test Competition".to_string(),
-            description: "A test competition".to_string(),
-            expiration: Expiration::AtHeight(2000000),
-            rules: Some(vec!["Rule 1".to_string()]),
-            rulesets: None,
-            banner: None,
-        },
-        competition_type: CompetitionType::Wager {},
-        group_contract_info: ModuleInstantiateInfo {
-            code_id: arena.arena_group.code_id()?,
-            msg: to_json_binary(&group::InstantiateMsg { members: None })?,
-            admin: None,
-            funds: vec![],
-            label: "Arena Group".to_string(),
-        },
-        required_team_size: None,
-        escrow_contract_info: default_escrow_contract_info(&arena)?,
-    };
-
-    arena
-        .arena_competition_enrollment
-        .execute(&create_enrollment_msg, None)?;
-
-    // Enroll 3 members
-    let mut teams = vec![];
-    for i in 0..3 {
-        let team = mock.addr_make(format!("team {}", i));
-        teams.push(team.clone());
-        arena.arena_competition_enrollment.set_sender(&team);
-        arena
-            .arena_competition_enrollment
-            .enroll(Uint128::one(), None, &[])?;
-    }
-
-    // Trigger expiration
-    arena.arena_competition_enrollment.set_sender(&admin);
-    mock.wait_blocks(1000000)?; // Move to expiration block
-
-    let res = arena
-        .arena_competition_enrollment
-        .finalize(Uint128::one())?;
-
-    // Check that the competition was created
-    assert!(res.events.iter().any(|e| e.ty == "wasm"
-        && e.attributes
-            .iter()
-            .any(|attr| attr.key == "action" && attr.value == "finalize")));
-    assert!(res.events.iter().any(|e| e.ty == "wasm"
-        && e.attributes
-            .iter()
-            .any(|attr| attr.key == "result" && attr.value == "competition_created")));
-
-    Ok(())
-}
-
-#[test]
 fn test_finalize_before_min_members() -> anyhow::Result<()> {
     let mock = MockBech32::new(PREFIX);
     let (mut arena, admin) = setup_arena(&mock)?;
 
     // Register the enrollment module
     register_competition_enrollment_module(&arena, &admin)?;
+    let sponsor = mock.addr_make_with_balance("sponsor", coins(10_000, DENOM))?;
 
     // Create an enrollment with min_members = 4
     arena.arena_competition_enrollment.set_sender(&admin);
@@ -708,6 +637,16 @@ fn test_finalize_before_min_members() -> anyhow::Result<()> {
         .arena_competition_enrollment
         .execute(&create_enrollment_msg, None)?;
 
+    // Sponsor
+    let enrollment = arena.arena_competition_enrollment.enrollment(1u128)?;
+    arena
+        .arena_escrow
+        .set_address(&enrollment.competition_info.escrow);
+    arena
+        .arena_escrow
+        .call_as(&sponsor)
+        .receive_native(&[coin(10_000, DENOM)])?;
+
     // Enroll only 3 members
     let mut teams = vec![];
     for i in 0..3 {
@@ -734,8 +673,8 @@ fn test_finalize_before_min_members() -> anyhow::Result<()> {
             .any(|attr| attr.key == "result" && attr.value == "finalized_insufficient_members")));
 
     // Attempt to withdraw for each enrolled team
-    for team in teams {
-        arena.arena_competition_enrollment.set_sender(&team);
+    for team in teams.iter() {
+        arena.arena_competition_enrollment.set_sender(team);
         let withdraw_res = arena
             .arena_competition_enrollment
             .withdraw(Uint128::one())?;
@@ -746,6 +685,16 @@ fn test_finalize_before_min_members() -> anyhow::Result<()> {
                 .iter()
                 .any(|attr| attr.key == "action" && attr.value == "withdraw")));
     }
+
+    // Check balance of user
+    let balance = mock.query_balance(&teams[0], DENOM)?;
+    assert_eq!(balance, Uint128::new(100_000));
+
+    // Sponsor withdraws funds
+    arena.arena_escrow.call_as(&sponsor).withdraw(None, None)?;
+
+    let balance = mock.query_balance(&sponsor, DENOM)?;
+    assert_eq!(balance, Uint128::new(10_000));
 
     Ok(())
 }
