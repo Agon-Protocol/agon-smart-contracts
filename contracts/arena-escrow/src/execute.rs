@@ -283,138 +283,147 @@ pub fn distribute(
     let mut msgs = vec![];
     let mut attrs = vec![];
 
-    // Process layered fees if provided
-    if let Some(layered_fees) = layered_fees.as_ref() {
-        // Validate the tax info
-        let validated_layered_fees: Vec<FeeInformation<Addr>> = layered_fees
-            .iter()
-            .map(|fee| fee.into_checked(deps.as_ref()))
-            .collect::<StdResult<_>>()?;
-
-        // Process each fee
-        for fee in validated_layered_fees {
-            let fee_amounts = total_balance.checked_mul_floor(fee.tax)?;
-
-            // Update total balance
-            total_balance = TOTAL_BALANCE.update(deps.storage, |x| -> Result<_, BalanceError> {
-                x.checked_sub(&fee_amounts)
-            })?;
-
-            // Add messages for fee transmission if amounts are not empty
-            if !fee_amounts.is_empty() {
-                msgs.extend(fee_amounts.transmit_all(
-                    deps.as_ref(),
-                    &fee.receiver,
-                    fee.cw20_msg,
-                    fee.cw721_msg,
-                )?);
-                attrs.push(("Fee", fee.receiver.to_string()));
-            }
-        }
-    }
-
-    // Create a distribution of all members if not provided
-    let distribution = distribution.unwrap_or({
-        let members: Vec<MemberMsg<String>> = deps.querier.query_wasm_smart(
-            group_contract.to_string(),
-            &group::QueryMsg::Members {
-                start_after: None,
-                limit: None,
-            },
-        )?;
-        let percentage = Decimal::from_ratio(1u128, members.len() as u128);
-        let remainder_addr = members[0].addr.clone();
-        Distribution {
-            member_percentages: members
-                .into_iter()
-                .map(|x| MemberPercentage {
-                    addr: x.addr,
-                    percentage,
-                })
-                .collect(),
-            remainder_addr,
-        }
-    });
-
-    let distribution = distribution.into_checked(deps.as_ref())?;
-
-    // Validate distribution is valid
-    if !deps.querier.query_wasm_smart::<bool>(
-        group_contract.to_string(),
-        &group::QueryMsg::IsValidDistribution {
-            addrs: distribution
-                .member_percentages
+    if !total_balance.is_empty() {
+        // Process layered fees if provided
+        if let Some(layered_fees) = layered_fees.as_ref() {
+            // Validate the tax info
+            let validated_layered_fees: Vec<FeeInformation<Addr>> = layered_fees
                 .iter()
-                .map(|x| x.addr.to_string())
-                .chain(iter::once(distribution.remainder_addr.to_string()))
-                .collect(),
-        },
-    )? {
-        return Err(ContractError::InvalidDistribution {
-            msg: "The distribution must contain only members of the competition".to_string(),
-        });
-    }
+                .map(|fee| fee.into_checked(deps.as_ref()))
+                .collect::<StdResult<_>>()?;
 
-    // Calculate the distribution amounts based on the total balance and distribution
-    let distributed_amounts = total_balance.split(&distribution)?;
+            // Process each fee
+            for fee in validated_layered_fees {
+                let fee_amounts = total_balance.checked_mul_floor(fee.tax)?;
 
-    // Clear existing balance storage
-    BALANCE.clear(deps.storage);
+                // Update total balance
+                total_balance = TOTAL_BALANCE
+                    .update(deps.storage, |x| -> Result<_, BalanceError> {
+                        x.checked_sub(&fee_amounts)
+                    })?;
 
-    // Query payment registry
-    let payment_registry: Option<String> = deps.querier.query_wasm_smart(
-        info.sender.to_string(),
-        &arena_interface::competition::msg::QueryBase::PaymentRegistry::<Empty, Empty, Empty> {},
-    )?;
-    let payment_registry = payment_registry
-        .map(|x| deps.api.addr_validate(&x))
-        .transpose()?;
-
-    // Process each distributed amount
-    for distributed_amount in distributed_amounts {
-        let mut has_preset_distribution = false;
-
-        if let Some(ref payment_registry) = payment_registry {
-            // Query preset distribution from payment registry
-            let preset_distribution: Option<Distribution<String>> = deps.querier.query_wasm_smart(
-                payment_registry.to_string(),
-                &arena_interface::registry::QueryMsg::GetDistribution {
-                    addr: distributed_amount.addr.to_string(),
-                    height: activation_height,
-                },
-            )?;
-
-            if let Some(preset_distribution) = preset_distribution {
-                let preset_distribution = preset_distribution.into_checked(deps.as_ref())?;
-                let new_balances = distributed_amount.balance.split(&preset_distribution)?;
-                has_preset_distribution = true;
-
-                // Update balances based on preset distribution
-                for new_balance in new_balances {
-                    BALANCE.update(
-                        deps.storage,
-                        &new_balance.addr,
-                        |old_balance| -> StdResult<_> {
-                            old_balance
-                                .unwrap_or_default()
-                                .checked_add(&new_balance.balance)
-                        },
-                    )?;
+                // Add messages for fee transmission if amounts are not empty
+                if !fee_amounts.is_empty() {
+                    msgs.extend(fee_amounts.transmit_all(
+                        deps.as_ref(),
+                        &fee.receiver,
+                        fee.cw20_msg,
+                        fee.cw721_msg,
+                    )?);
+                    attrs.push(("Fee", fee.receiver.to_string()));
                 }
             }
         }
 
-        if !has_preset_distribution {
-            // Update balance directly if no preset distribution
-            BALANCE.update(
-                deps.storage,
-                &distributed_amount.addr,
-                |old_balance| -> StdResult<_> {
-                    old_balance
-                        .unwrap_or_default()
-                        .checked_add(&distributed_amount.balance)
+        // Create a distribution of all members if not provided
+        let distribution = distribution.unwrap_or({
+            let members: Vec<MemberMsg<String>> = deps.querier.query_wasm_smart(
+                group_contract.to_string(),
+                &group::QueryMsg::Members {
+                    start_after: None,
+                    limit: None,
                 },
             )?;
+            let percentage = Decimal::from_ratio(1u128, members.len() as u128);
+            let remainder_addr = members[0].addr.clone();
+            Distribution {
+                member_percentages: members
+                    .into_iter()
+                    .map(|x| MemberPercentage {
+                        addr: x.addr,
+                        percentage,
+                    })
+                    .collect(),
+                remainder_addr,
+            }
+        });
+
+        let distribution = distribution.into_checked(deps.as_ref())?;
+
+        // Validate distribution is valid
+        if !deps.querier.query_wasm_smart::<bool>(
+            group_contract.to_string(),
+            &group::QueryMsg::IsValidDistribution {
+                addrs: distribution
+                    .member_percentages
+                    .iter()
+                    .map(|x| x.addr.to_string())
+                    .chain(iter::once(distribution.remainder_addr.to_string()))
+                    .collect(),
+            },
+        )? {
+            return Err(ContractError::InvalidDistribution {
+                msg: "The distribution must contain only members of the competition".to_string(),
+            });
+        }
+
+        // Calculate the distribution amounts based on the total balance and distribution
+        let distributed_amounts = total_balance.split(&distribution)?;
+
+        // Clear existing balance storage
+        BALANCE.clear(deps.storage);
+
+        // Query payment registry
+        let payment_registry: Option<String> =
+            deps.querier.query_wasm_smart(
+                info.sender.to_string(),
+                &arena_interface::competition::msg::QueryBase::PaymentRegistry::<
+                    Empty,
+                    Empty,
+                    Empty,
+                > {},
+            )?;
+        let payment_registry = payment_registry
+            .map(|x| deps.api.addr_validate(&x))
+            .transpose()?;
+
+        // Process each distributed amount
+        for distributed_amount in distributed_amounts {
+            let mut has_preset_distribution = false;
+
+            if let Some(ref payment_registry) = payment_registry {
+                // Query preset distribution from payment registry
+                let preset_distribution: Option<Distribution<String>> =
+                    deps.querier.query_wasm_smart(
+                        payment_registry.to_string(),
+                        &arena_interface::registry::QueryMsg::GetDistribution {
+                            addr: distributed_amount.addr.to_string(),
+                            height: activation_height,
+                        },
+                    )?;
+
+                if let Some(preset_distribution) = preset_distribution {
+                    let preset_distribution = preset_distribution.into_checked(deps.as_ref())?;
+                    let new_balances = distributed_amount.balance.split(&preset_distribution)?;
+                    has_preset_distribution = true;
+
+                    // Update balances based on preset distribution
+                    for new_balance in new_balances {
+                        BALANCE.update(
+                            deps.storage,
+                            &new_balance.addr,
+                            |old_balance| -> StdResult<_> {
+                                old_balance
+                                    .unwrap_or_default()
+                                    .checked_add(&new_balance.balance)
+                            },
+                        )?;
+                    }
+                }
+            }
+
+            if !has_preset_distribution {
+                // Update balance directly if no preset distribution
+                BALANCE.update(
+                    deps.storage,
+                    &distributed_amount.addr,
+                    |old_balance| -> StdResult<_> {
+                        old_balance
+                            .unwrap_or_default()
+                            .checked_add(&distributed_amount.balance)
+                    },
+                )?;
+            }
         }
     }
 
