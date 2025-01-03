@@ -1,13 +1,15 @@
 use cosmwasm_std::{
     entry_point, to_json_binary, BankMsg, Binary, Deps, DepsMut, Env, MessageInfo, Order, Response,
-    StdResult, WasmMsg,
+    StdResult, Uint128, WasmMsg,
 };
 use cw2::{ensure_from_older_version, set_contract_version};
 use cw_ownable::assert_owner;
 
 use crate::{
     msg::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg},
-    state::{discord_identity, DISCORD_CONNECTIONS, FAUCET_AMOUNT, HAS_DISCORD_RECEIVED},
+    state::{
+        discord_identity, DISCORD_CONNECTIONS, FAUCET_AMOUNT, HAS_DISCORD_RECEIVED, USER_COUNT,
+    },
     ContractError,
 };
 
@@ -25,6 +27,7 @@ pub fn instantiate(
 
     let owner = deps.api.addr_validate(&msg.owner)?;
     let ownership = cw_ownable::initialize_owner(deps.storage, deps.api, Some(owner.as_str()))?;
+    USER_COUNT.save(deps.storage, &Uint128::zero())?;
 
     Ok(Response::new()
         .add_attributes(ownership.into_attributes())
@@ -61,23 +64,27 @@ pub fn execute(
             let discord_identity = discord_identity();
             let user = deps.api.addr_validate(&addr)?;
             let mut msgs = vec![];
-            if !discord_identity.has(deps.storage, &user)
-                && !HAS_DISCORD_RECEIVED.has(deps.storage, discord_profile.user_id.u64())
-            {
-                let faucet_amount = FAUCET_AMOUNT.load(deps.storage)?;
-                HAS_DISCORD_RECEIVED.save(deps.storage, discord_profile.user_id.u64(), &())?;
+            if !discord_identity.has(deps.storage, &user) {
+                USER_COUNT.update(deps.storage, |x| -> StdResult<_> {
+                    Ok(x.checked_add(Uint128::one())?)
+                })?;
 
-                if deps
-                    .querier
-                    .query_balance(&user, &faucet_amount.denom)?
-                    .amount
-                    .is_zero()
-                {
-                    let amount = vec![faucet_amount];
-                    msgs.push(BankMsg::Send {
-                        to_address: user.to_string(),
-                        amount,
-                    })
+                if !HAS_DISCORD_RECEIVED.has(deps.storage, discord_profile.user_id.u64()) {
+                    let faucet_amount = FAUCET_AMOUNT.load(deps.storage)?;
+                    HAS_DISCORD_RECEIVED.save(deps.storage, discord_profile.user_id.u64(), &())?;
+
+                    if deps
+                        .querier
+                        .query_balance(&user, &faucet_amount.denom)?
+                        .amount
+                        .is_zero()
+                    {
+                        let amount = vec![faucet_amount];
+                        msgs.push(BankMsg::Send {
+                            to_address: user.to_string(),
+                            amount,
+                        })
+                    }
                 }
             }
 
@@ -152,6 +159,7 @@ pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
             )
         }
         QueryMsg::Ownership {} => to_json_binary(&cw_ownable::get_ownership(deps.storage)?),
+        QueryMsg::UserCount {} => to_json_binary(&USER_COUNT.load(deps.storage)?),
     }
 }
 
@@ -170,6 +178,13 @@ pub fn migrate(deps: DepsMut, _env: Env, msg: MigrateMsg) -> StdResult<Response>
                 HAS_DISCORD_RECEIVED.save(deps.storage, discord_profile.user_id.u64(), &())?;
             }
         }
+    } else if matches!(msg, MigrateMsg::SetUserCount {}) {
+        let len = HAS_DISCORD_RECEIVED
+            .range(deps.storage, None, None, Order::Ascending)
+            .collect::<StdResult<Vec<_>>>()?
+            .len() as u128;
+
+        USER_COUNT.save(deps.storage, &Uint128::new(len))?;
     }
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;

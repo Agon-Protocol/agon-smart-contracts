@@ -1,4 +1,4 @@
-use cosmwasm_std::{Addr, Coin};
+use cosmwasm_std::{Addr, Coin, Uint128};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 
 use crate::msg::{DiscordConnection, DiscordProfile};
@@ -29,3 +29,4 @@ pub fn discord_identity<'a>() -> IndexedMap<'a, &'a Addr, DiscordProfile, Discor
 pub const DISCORD_CONNECTIONS: Map<u64, Vec<DiscordConnection>> = Map::new("discord_connections");
 pub const FAUCET_AMOUNT: Item<Coin> = Item::new("faucet_amount");
 pub const HAS_DISCORD_RECEIVED: Map<u64, ()> = Map::new("has_discord_received");
+pub const USER_COUNT: Item<Uint128> = Item::new("user_count");
