@@ -538,7 +538,10 @@ pub fn enroll(
 
     // Ensure team size requirement is handled
     if let Some(required_team_size) = enrollment.required_team_size {
-        if required_team_size != 1 || deps.querier.query_wasm_contract_info(&member).is_ok() {
+        if required_team_size != 1 {
+            deps.querier
+                .query_wasm_contract_info(&member)
+                .map_err(|_| ContractError::TeamSizeMismatch { required_team_size })?;
             let dao_voting_module: Addr = deps.querier.query_wasm_smart(
                 member.to_string(),
                 &dao_interface::msg::QueryMsg::VotingModule {},
