@@ -422,6 +422,7 @@ fn test_wager() -> anyhow::Result<()> {
     let team1 = mock.addr_make_with_balance("team 1", coins(100_000u128, DENOM))?;
     let team2 = mock.addr_make_with_balance("team 2", coins(100_000u128, DENOM))?;
     let fee_receiver = mock.addr_make("fee receiver");
+    let sponsor = mock.addr_make_with_balance("sponsor", coins(10_000u128, DENOM))?;
 
     // Register the enrollment module
     register_competition_enrollment_module(&arena, &admin)?;
@@ -474,6 +475,16 @@ fn test_wager() -> anyhow::Result<()> {
         .arena_competition_enrollment
         .execute(&create_enrollment_msg, None)?;
 
+    // Sponsor
+    let enrollment = arena.arena_competition_enrollment.enrollment(1u128)?;
+    arena
+        .arena_escrow
+        .set_address(&enrollment.competition_info.escrow);
+    arena
+        .arena_escrow
+        .call_as(&sponsor)
+        .receive_native(&[coin(10_000, DENOM)])?;
+
     // Enroll 2 members
     arena.arena_competition_enrollment.set_sender(&team1);
     arena
@@ -520,18 +531,18 @@ fn test_wager() -> anyhow::Result<()> {
     arena
         .arena_escrow
         .set_address(&enrollment.competition_info.escrow);
-    // 5% platform fee of 2000
+    // 5% platform fee of 12000
     let balance = mock.query_balance(&arena.dao_dao.dao_core.address()?, DENOM)?;
-    assert_eq!(balance, Uint128::new(100));
-    // 10% layered fee of 1900
+    assert_eq!(balance, Uint128::new(600));
+    // 10% layered fee of 11400
     let balance = mock.query_balance(&fee_receiver, DENOM)?;
-    assert_eq!(balance, Uint128::new(190));
-    // 100% of leftover 1710
+    assert_eq!(balance, Uint128::new(1140));
+    // 100% of leftover 10260
     let balance = arena.arena_escrow.balance(team1)?;
     assert_eq!(
         balance,
         Some(BalanceVerified {
-            native: Some(coins(1710, DENOM)),
+            native: Some(coins(10260, DENOM)),
             cw20: None,
             cw721: None
         })
@@ -677,6 +688,10 @@ fn test_finalize_before_min_members() -> anyhow::Result<()> {
         .arena_escrow
         .call_as(&sponsor)
         .receive_native(&[coin(10_000, DENOM)])?;
+
+    // Ensure sponsor withdraw fails
+    let result = arena.arena_escrow.call_as(&sponsor).withdraw(None, None);
+    assert!(result.is_err());
 
     // Enroll only 3 members
     let mut teams = vec![];

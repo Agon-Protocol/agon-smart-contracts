@@ -31,9 +31,6 @@ pub fn enrollment_withdraw(
     addrs: Vec<String>,
     entry_fee: Coin,
 ) -> Result<Response, ContractError> {
-    if is_locked(deps.as_ref()) {
-        return Err(ContractError::Locked {});
-    }
     ensure!(
         ENROLLMENT_CONTRACT.exists(deps.storage),
         ContractError::Unauthorized {}

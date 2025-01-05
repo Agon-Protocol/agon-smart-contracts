@@ -21,7 +21,7 @@ use arena_interface::{
     core::{ProposeMessage, TaxConfigurationResponse},
     escrow,
     fees::FeeInformation,
-    group::GroupContractInfo,
+    group::{self, GroupContractInfo},
     ratings::MemberResult,
 };
 use cosmwasm_schema::schemars::JsonSchema;
@@ -438,6 +438,17 @@ impl<
                 current_status: competition.status,
             });
         }
+
+        // Validate the user is a member
+        ensure!(
+            deps.querier.query_wasm_smart::<bool>(
+                competition.group_contract.to_string(),
+                &group::QueryMsg::IsMember {
+                    addr: info.sender.to_string()
+                }
+            )?,
+            CompetitionError::Unauthorized {}
+        );
 
         let mut evidence_id = self
             .competition_evidence_count

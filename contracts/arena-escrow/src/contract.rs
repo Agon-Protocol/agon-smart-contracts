@@ -37,8 +37,10 @@ pub fn instantiate_contract(
 
     if is_enrollment {
         ENROLLMENT_CONTRACT.save(deps.storage, &info.sender)?;
+        IS_LOCKED.save(deps.storage, &true)?;
+    } else {
+        IS_LOCKED.save(deps.storage, &false)?;
     }
-    IS_LOCKED.save(deps.storage, &false)?;
     for member_balance in dues {
         let member_balance = member_balance.into_checked(deps.as_ref())?;
 
