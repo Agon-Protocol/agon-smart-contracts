@@ -134,7 +134,6 @@ fn deploy_to_network(network: Network, component: &DeployComponent) -> anyhow::R
             deploy_core(&daemon)?;
             deploy_tournament(&daemon)?;
             deploy_enrollment(&daemon)?;
-            deploy_token_gateway(&daemon)?;
             deploy_competition_modules(&daemon)?;
             deploy_group(&daemon)?;
             if matches!(network, Network::Mainnet) {
