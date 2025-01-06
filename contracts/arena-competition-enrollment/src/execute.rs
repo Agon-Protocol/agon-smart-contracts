@@ -1,16 +1,17 @@
 use arena_interface::{
-    competition::msg::EscrowInstantiateInfo,
+    competition::msg::EscrowContractInfo,
     core::{CompetitionModuleQuery, CompetitionModuleResponse},
+    escrow::{self},
+    fees::FeeInformation,
     group::{self, GroupContractInfo, MemberMsg},
 };
 use arena_league_module::msg::LeagueInstantiateExt;
 use arena_tournament_module::{msg::TournamentInstantiateExt, state::EliminationType};
 use arena_wager_module::msg::WagerInstantiateExt;
 use cosmwasm_std::{
-    ensure, instantiate2_address, to_json_binary, Addr, Attribute, BankMsg, Coin, CosmosMsg,
-    DepsMut, Env, MessageInfo, Response, StdError, StdResult, SubMsg, Uint128, Uint64, WasmMsg,
+    ensure, instantiate2_address, to_json_binary, Addr, Attribute, Coin, CosmosMsg, DepsMut, Env,
+    MessageInfo, Response, StdError, StdResult, SubMsg, Uint128, Uint64, WasmMsg,
 };
-use cw_balance::{BalanceUnchecked, MemberBalanceUnchecked};
 use cw_utils::{must_pay, Expiration};
 use dao_interface::{state::ModuleInstantiateInfo, voting::VotingPowerAtHeightResponse};
 use itertools::Itertools as _;
@@ -25,7 +26,7 @@ use crate::{
     ContractError,
 };
 
-pub const TRIGGER_COMPETITION_REPLY_ID: u64 = 1;
+pub const FINALIZE_COMPETITION_REPLY_ID: u64 = 1;
 /// Team size is limited to cw4-group's max size limit
 const TEAM_SIZE_LIMIT: u32 = 30;
 
@@ -42,7 +43,8 @@ pub fn create_enrollment(
     competition_info: CompetitionInfoMsg,
     competition_type: CompetitionType,
     group_contract_info: ModuleInstantiateInfo,
-    require_team_size: Option<u32>,
+    required_team_size: Option<u32>,
+    escrow_contract_info: EscrowContractInfo,
 ) -> Result<Response, ContractError> {
     ensure!(
         !expiration.is_expired(&env.block),
@@ -134,17 +136,11 @@ pub fn create_enrollment(
         ))
     }?;
 
-    // Validate additional layered fees before saving
-    if let Some(additional_layered_fees) = &competition_info.additional_layered_fees {
-        additional_layered_fees
-            .iter()
-            .map(|x| x.into_checked(deps.as_ref()))
-            .collect::<StdResult<Vec<_>>>()?;
-    }
-
     let competition_id = ENROLLMENT_COUNT.update(deps.storage, |x| -> StdResult<_> {
         Ok(x.checked_add(Uint128::one())?)
     })?;
+
+    let mut msgs = vec![];
 
     // Generate the group contract
     let binding = format!("{}{}{}", info.sender, env.block.height, competition_id);
@@ -155,16 +151,69 @@ pub fn create_enrollment(
         .query_wasm_code_info(group_contract_info.code_id)?;
     let canonical_addr = instantiate2_address(&code_info.checksum, &canonical_creator, &salt)?;
 
-    let msg = CosmosMsg::Wasm(WasmMsg::Instantiate2 {
+    msgs.push(CosmosMsg::Wasm(WasmMsg::Instantiate2 {
         admin: Some(env.contract.address.to_string()),
         code_id: group_contract_info.code_id,
         label: group_contract_info.label,
         msg: group_contract_info.msg,
         funds: vec![],
         salt: salt.into(),
-    });
+    }));
 
     let group_contract = deps.api.addr_humanize(&canonical_addr)?;
+
+    // Handle escrow setup
+    let (escrow_addr, fees) = match escrow_contract_info {
+        EscrowContractInfo::Existing {
+            addr,
+            additional_layered_fees,
+        } => {
+            let addr = deps.api.addr_validate(&addr)?;
+            let fees = additional_layered_fees
+                .map(|fees| {
+                    fees.iter()
+                        .map(|fee| fee.into_checked(deps.as_ref()))
+                        .collect::<StdResult<Vec<_>>>()
+                })
+                .transpose()?;
+
+            (addr, fees)
+        }
+        EscrowContractInfo::New {
+            code_id,
+            msg,
+            label,
+            additional_layered_fees,
+        } => {
+            let fees = additional_layered_fees
+                .map(|fees| {
+                    fees.iter()
+                        .map(|fee| fee.into_checked(deps.as_ref()))
+                        .collect::<StdResult<Vec<_>>>()
+                })
+                .transpose()?;
+
+            let binding = format!("{}{}{}", info.sender, env.block.height, competition_id);
+            let salt: [u8; 32] = Sha256::digest(binding.as_bytes()).into();
+            let canonical_creator = deps.api.addr_canonicalize(env.contract.address.as_str())?;
+            let code_info = deps.querier.query_wasm_code_info(code_id)?;
+            let canonical_addr =
+                instantiate2_address(&code_info.checksum, &canonical_creator, &salt)?;
+
+            msgs.push(CosmosMsg::Wasm(WasmMsg::Instantiate2 {
+                admin: Some(env.contract.address.to_string()),
+                code_id,
+                label,
+                msg,
+                funds: vec![],
+                salt: salt.into(),
+            }));
+
+            let escrow_addr = deps.api.addr_humanize(&canonical_addr)?;
+
+            (escrow_addr, fees)
+        }
+    };
 
     enrollment_entries().save(
         deps.storage,
@@ -174,7 +223,7 @@ pub fn create_enrollment(
             max_members,
             entry_fee,
             expiration,
-            has_triggered_expiration: false,
+            has_finalized: false,
             competition_info: CompetitionInfo::Pending {
                 name: competition_info.name,
                 description: competition_info.description,
@@ -182,83 +231,110 @@ pub fn create_enrollment(
                 rules: competition_info.rules,
                 rulesets: competition_info.rulesets,
                 banner: competition_info.banner,
-                additional_layered_fees: competition_info.additional_layered_fees,
+                additional_layered_fees: fees,
+                escrow: escrow_addr,
+                group_contract,
             },
             competition_type,
             host: info.sender,
             category_id,
             competition_module,
-            group_contract,
-            required_team_size: require_team_size,
+            required_team_size,
         },
     )?;
 
     Ok(Response::new()
         .add_attribute("action", "create_enrollment")
         .add_attribute("id", competition_id)
-        .add_message(msg))
+        .add_messages(msgs))
 }
 
-pub fn trigger_expiration(
+pub fn finalize(
     deps: DepsMut,
     env: Env,
     info: MessageInfo,
     id: Uint128,
-    escrow_id: u64,
 ) -> Result<Response, ContractError> {
-    let entry = enrollment_entries().load(deps.storage, id.u128())?;
+    // Load enrollment entry from storage
+    let enrollment = enrollment_entries().load(deps.storage, id.u128())?;
 
-    ensure!(entry.host == info.sender, ContractError::Unauthorized {});
+    // Authorization checks
     ensure!(
-        !entry.has_triggered_expiration,
-        ContractError::StdError(StdError::generic_err(
-            "Competition creation has already been triggered"
-        ))
+        enrollment.host == info.sender,
+        ContractError::Unauthorized {}
+    );
+    ensure!(
+        !enrollment.has_finalized,
+        ContractError::AlreadyFinalized {}
     );
 
+    // Get competition info reference and validate
+    let (group_contract, escrow) = match &enrollment.competition_info {
+        CompetitionInfo::Pending {
+            escrow,
+            group_contract,
+            ..
+        } => (group_contract, escrow),
+        CompetitionInfo::Existing { .. } => return Err(ContractError::AlreadyFinalized {}),
+    };
+
+    // Query current member count
     let members_count: Uint64 = deps.querier.query_wasm_smart(
-        entry.group_contract.to_string(),
+        group_contract.to_string(),
         &group::QueryMsg::MembersCount {},
     )?;
 
-    // Check if we have met the minimum number of members
-    let min_min_members = get_min_min_members(&entry.competition_type);
-    let min_members = entry.min_members.unwrap_or(min_min_members);
-    let is_expired = entry.expiration.is_expired(&env.block);
+    // Check member requirements and expiration
+    let min_min_members = get_min_min_members(&enrollment.competition_type);
+    let min_members = enrollment.min_members.unwrap_or(min_min_members);
+    let is_expired = enrollment.expiration.is_expired(&env.block);
 
+    // Create updated entry with finalized status
+    let new_enrollment = EnrollmentEntry {
+        has_finalized: true,
+        ..enrollment.clone()
+    };
+
+    // Handle case when there are insufficient members and enrollment is expired
     if members_count < min_members && is_expired {
-        // Set has_triggered_expiration to true and save the entry
-        let new_data = EnrollmentEntry {
-            has_triggered_expiration: true,
-            ..entry.clone()
-        };
-        enrollment_entries().replace(deps.storage, id.u128(), Some(&new_data), Some(&entry))?;
+        enrollment_entries().replace(
+            deps.storage,
+            id.u128(),
+            Some(&new_enrollment),
+            Some(&enrollment),
+        )?;
 
-        // Return a response indicating the enrollment was expired due to insufficient members
+        // Unlock escrow
+        let escrow_msg = WasmMsg::Execute {
+            contract_addr: escrow.to_string(),
+            msg: to_json_binary(&escrow::ExecuteMsg::Lock {
+                value: false,
+                transfer_ownership: None,
+            })?,
+            funds: vec![],
+        };
+
         return Ok(Response::new()
-            .add_attribute("action", "trigger_expiration")
-            .add_attribute("result", "expired_insufficient_members")
+            .add_attribute("action", "finalize")
+            .add_attribute("result", "finalized_insufficient_members")
             .add_attribute("id", id.to_string())
             .add_attribute("required_members", min_members.to_string())
-            .add_attribute("actual_members", members_count.to_string()));
+            .add_attribute("actual_members", members_count.to_string())
+            .add_message(escrow_msg));
     }
 
+    // Verify member count requirements are met
     ensure!(
-        entry.max_members == members_count || is_expired,
-        ContractError::TriggerFailed {
-            max_members: entry.max_members,
+        enrollment.max_members == members_count || is_expired,
+        ContractError::FinalizeFailed {
+            max_members: enrollment.max_members,
             current_members: members_count,
-            expiration: entry.expiration
+            expiration: enrollment.expiration
         }
     );
 
-    let mut enrollment_info = EnrollmentInfo {
-        enrollment_id: id.u128(),
-        module_addr: entry.competition_module.clone(),
-        amount: None,
-    };
-
-    let creation_msg = match entry.competition_info.clone() {
+    // Create competition message based on competition type
+    let creation_msg = match &enrollment.competition_info {
         CompetitionInfo::Pending {
             name,
             description,
@@ -267,54 +343,46 @@ pub fn trigger_expiration(
             rulesets,
             banner,
             additional_layered_fees,
-        } => Ok({
-            let escrow = if let Some(entry_fee) = &entry.entry_fee {
-                let members_count: Uint64 = deps.querier.query_wasm_smart(
-                    entry.group_contract.to_string(),
-                    &group::QueryMsg::MembersCount {},
-                )?;
-                let total = Coin {
-                    denom: entry_fee.denom.clone(),
-                    amount: entry_fee.amount.checked_mul(members_count.into())?,
-                };
+            escrow,
+            group_contract,
+        } => {
+            // Process additional fee information
+            let additional_layered_fees = additional_layered_fees.as_ref().map(|fees| {
+                fees.iter()
+                    .map(|fee| FeeInformation {
+                        tax: fee.tax,
+                        receiver: fee.receiver.to_string(),
+                        cw20_msg: fee.cw20_msg.clone(),
+                        cw721_msg: fee.cw721_msg.clone(),
+                    })
+                    .collect_vec()
+            });
 
-                enrollment_info.amount = Some(total.clone());
-
-                Some(EscrowInstantiateInfo {
-                    code_id: escrow_id,
-                    msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                        dues: vec![MemberBalanceUnchecked {
-                            addr: env.contract.address.to_string(),
-                            balance: BalanceUnchecked {
-                                native: Some(vec![total]),
-                                cw20: None,
-                                cw721: None,
-                            },
-                        }],
-                    })?,
-                    label: "Arena Escrow".to_string(),
-                    additional_layered_fees,
-                })
-            } else {
-                None
+            // Prepare contract information
+            let escrow_info = EscrowContractInfo::Existing {
+                addr: escrow.to_string(),
+                additional_layered_fees,
             };
 
-            match entry.competition_type.clone() {
+            let group_info = GroupContractInfo::Existing {
+                addr: group_contract.to_string(),
+            };
+
+            // Create appropriate competition message based on type
+            match &enrollment.competition_type {
                 CompetitionType::Wager {} => {
                     to_json_binary(&arena_wager_module::msg::ExecuteMsg::CreateCompetition {
-                        host: Some(entry.host.to_string()),
-                        category_id: entry.category_id,
-                        escrow,
-                        name,
-                        description,
-                        expiration,
-                        rules,
-                        rulesets,
-                        banner,
+                        host: Some(enrollment.host.to_string()),
+                        category_id: enrollment.category_id,
+                        escrow: escrow_info.clone(),
+                        name: name.clone(),
+                        description: description.clone(),
+                        expiration: *expiration,
+                        rules: rules.clone(),
+                        rulesets: rulesets.clone(),
+                        banner: banner.clone(),
                         instantiate_extension: WagerInstantiateExt {},
-                        group_contract: GroupContractInfo::Existing {
-                            addr: entry.group_contract.to_string(),
-                        },
+                        group_contract: group_info.clone(),
                     })?
                 }
                 CompetitionType::League {
@@ -323,109 +391,128 @@ pub fn trigger_expiration(
                     match_lose_points,
                     distribution,
                 } => to_json_binary(&arena_league_module::msg::ExecuteMsg::CreateCompetition {
-                    host: Some(entry.host.to_string()),
-                    category_id: entry.category_id,
-                    escrow,
-                    name,
-                    description,
-                    expiration,
-                    rules,
-                    rulesets,
-                    banner,
+                    host: Some(enrollment.host.to_string()),
+                    category_id: enrollment.category_id,
+                    escrow: escrow_info.clone(),
+                    name: name.clone(),
+                    description: description.clone(),
+                    expiration: *expiration,
+                    rules: rules.clone(),
+                    rulesets: rulesets.clone(),
+                    banner: banner.clone(),
                     instantiate_extension: LeagueInstantiateExt {
-                        match_win_points,
-                        match_draw_points,
-                        match_lose_points,
-                        distribution,
+                        match_win_points: *match_win_points,
+                        match_draw_points: *match_draw_points,
+                        match_lose_points: *match_lose_points,
+                        distribution: distribution.clone(),
                     },
-                    group_contract: GroupContractInfo::Existing {
-                        addr: entry.group_contract.to_string(),
-                    },
+                    group_contract: group_info.clone(),
                 })?,
                 CompetitionType::Tournament {
                     elimination_type,
                     distribution,
                 } => to_json_binary(
                     &arena_tournament_module::msg::ExecuteMsg::CreateCompetition {
-                        host: Some(entry.host.to_string()),
-                        category_id: entry.category_id,
-                        escrow,
-                        name,
-                        description,
-                        expiration,
-                        rules,
-                        rulesets,
-                        banner,
+                        host: Some(enrollment.host.to_string()),
+                        category_id: enrollment.category_id,
+                        escrow: escrow_info.clone(),
+                        name: name.clone(),
+                        description: description.clone(),
+                        expiration: *expiration,
+                        rules: rules.clone(),
+                        rulesets: rulesets.clone(),
+                        banner: banner.clone(),
                         instantiate_extension: TournamentInstantiateExt {
-                            elimination_type,
-                            distribution,
+                            elimination_type: *elimination_type,
+                            distribution: distribution.clone(),
                         },
-                        group_contract: GroupContractInfo::Existing {
-                            addr: entry.group_contract.to_string(),
-                        },
+                        group_contract: group_info,
                     },
                 )?,
             }
-        }),
-        _ => Err(ContractError::AlreadyExpired {}),
-    }?;
+        }
+        CompetitionInfo::Existing { .. } => return Err(ContractError::AlreadyFinalized {}),
+    };
 
-    let sub_msg = SubMsg::reply_always(
+    // Save updated state
+    enrollment_entries().replace(
+        deps.storage,
+        id.u128(),
+        Some(&new_enrollment),
+        Some(&enrollment),
+    )?;
+    TEMP_ENROLLMENT_INFO.save(
+        deps.storage,
+        &EnrollmentInfo {
+            module_addr: enrollment.competition_module.clone(),
+            enrollment_id: id.u128(),
+            escrow_addr: escrow.clone(),
+        },
+    )?;
+
+    // Prepare msg
+    let submsg = SubMsg::reply_always(
         CosmosMsg::Wasm(WasmMsg::Execute {
-            contract_addr: entry.competition_module.to_string(),
+            contract_addr: enrollment.competition_module.to_string(),
             msg: creation_msg,
             funds: vec![],
         }),
-        TRIGGER_COMPETITION_REPLY_ID,
+        FINALIZE_COMPETITION_REPLY_ID,
     );
 
-    TEMP_ENROLLMENT_INFO.save(deps.storage, &enrollment_info)?;
-
+    // Return response with competition creation message
     Ok(Response::new()
-        .add_attribute("action", "trigger_expiration")
-        .add_attribute("competition_module", enrollment_info.module_addr)
+        .add_attribute("action", "finalize")
+        .add_attribute("competition_module", enrollment.competition_module)
         .add_attribute("id", id.to_string())
-        .add_attribute(
-            "amount",
-            enrollment_info
-                .amount
-                .map(|x| x.to_string())
-                .unwrap_or("None".to_owned()),
-        )
-        .add_submessage(sub_msg))
+        .add_submessage(submsg))
 }
 
 pub fn enroll(
     deps: DepsMut,
-    env: Env,
+    _env: Env,
     info: MessageInfo,
     id: Uint128,
     team: Option<String>,
 ) -> Result<Response, ContractError> {
-    let entry = enrollment_entries().load(deps.storage, id.u128())?;
+    let enrollment = enrollment_entries().load(deps.storage, id.u128())?;
 
     ensure!(
-        !entry.has_triggered_expiration || entry.expiration.is_expired(&env.block),
-        ContractError::AlreadyExpired {}
+        !enrollment.has_finalized,
+        ContractError::AlreadyFinalized {}
     );
-    if let Some(entry_fee) = &entry.entry_fee {
+    let (group_contract, escrow) = match &enrollment.competition_info {
+        CompetitionInfo::Pending {
+            escrow,
+            group_contract,
+            ..
+        } => (group_contract, escrow),
+        CompetitionInfo::Existing { .. } => return Err(ContractError::AlreadyFinalized {}),
+    };
+
+    let mut msgs = vec![];
+    if let Some(entry_fee) = enrollment.entry_fee {
         let paid_amount = must_pay(&info, &entry_fee.denom)?;
 
         ensure!(
             paid_amount == entry_fee.amount,
-            ContractError::EntryFeeNotPaid {
-                fee: entry_fee.amount
-            }
+            ContractError::EntryFeeNotPaid { entry_fee }
         );
-    }
+
+        msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: escrow.to_string(),
+            msg: to_json_binary(&escrow::ExecuteMsg::ReceiveNative {})?,
+            funds: vec![entry_fee],
+        }));
+    };
 
     let member_count: Uint64 = deps.querier.query_wasm_smart(
-        entry.group_contract.to_string(),
+        group_contract.to_string(),
         &group::QueryMsg::MembersCount {},
     )?;
 
     ensure!(
-        member_count < entry.max_members,
+        member_count < enrollment.max_members,
         ContractError::EnrollmentMaxMembers {}
     );
 
@@ -450,8 +537,11 @@ pub fn enroll(
     };
 
     // Ensure team size requirement is handled
-    if let Some(required_team_size) = entry.required_team_size {
-        if required_team_size != 1 || deps.querier.query_wasm_contract_info(&member).is_ok() {
+    if let Some(required_team_size) = enrollment.required_team_size {
+        if required_team_size != 1 {
+            deps.querier
+                .query_wasm_contract_info(&member)
+                .map_err(|_| ContractError::TeamSizeMismatch { required_team_size })?;
             let dao_voting_module: Addr = deps.querier.query_wasm_smart(
                 member.to_string(),
                 &dao_interface::msg::QueryMsg::VotingModule {},
@@ -475,8 +565,8 @@ pub fn enroll(
         }
     }
 
-    let msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: entry.group_contract.to_string(),
+    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: group_contract.to_string(),
         msg: to_json_binary(&group::ExecuteMsg::UpdateMembers {
             to_add: Some(vec![group::AddMemberMsg {
                 addr: member.to_string(),
@@ -486,11 +576,11 @@ pub fn enroll(
             to_update: None,
         })?,
         funds: vec![],
-    });
+    }));
 
     Ok(Response::new()
         .add_attribute("action", "enroll")
-        .add_message(msg))
+        .add_messages(msgs))
 }
 
 pub fn withdraw(
@@ -500,9 +590,10 @@ pub fn withdraw(
     id: Uint128,
 ) -> Result<Response, ContractError> {
     // Load the enrollment entry
-    let entry = enrollment_entries().load(deps.storage, id.u128())?;
+    let enrollment = enrollment_entries().load(deps.storage, id.u128())?;
 
-    Ok(_withdraw(entry, vec![info.sender], id)?.add_attribute("action", "withdraw"))
+    Ok(_withdraw(enrollment, vec![info.sender.to_string()], id)?
+        .add_attribute("action", "withdraw"))
 }
 
 pub fn force_withdraw(
@@ -513,15 +604,14 @@ pub fn force_withdraw(
     members: Vec<String>,
 ) -> Result<Response, ContractError> {
     // Load the enrollment entry
-    let entry = enrollment_entries().load(deps.storage, id.u128())?;
+    let enrollment = enrollment_entries().load(deps.storage, id.u128())?;
 
-    ensure!(entry.host == info.sender, ContractError::Unauthorized {});
+    ensure!(
+        enrollment.host == info.sender,
+        ContractError::Unauthorized {}
+    );
 
-    let members = members
-        .into_iter()
-        .unique()
-        .map(|x| deps.api.addr_validate(&x))
-        .collect::<StdResult<Vec<_>>>()?;
+    let members = members.into_iter().unique().collect::<Vec<_>>();
 
     ensure!(
         !members.is_empty(),
@@ -530,61 +620,60 @@ pub fn force_withdraw(
         ))
     );
 
-    Ok(_withdraw(entry, members, id)?.add_attribute("action", "force_withdraw"))
+    Ok(_withdraw(enrollment, members, id)?.add_attribute("action", "force_withdraw"))
 }
 
 pub fn _withdraw(
-    entry: EnrollmentEntry,
-    members: Vec<Addr>,
+    enrollment: EnrollmentEntry,
+    members: Vec<String>,
     id: Uint128,
 ) -> Result<Response, ContractError> {
-    // Check if the competition is still in Pending state
-    let is_pending = matches!(entry.competition_info, CompetitionInfo::Pending { .. });
-
-    // Ensure the competition hasn't been triggered yet and is still in Pending state
-    ensure!(
-        !entry.has_triggered_expiration || is_pending,
-        ContractError::AlreadyExpired {}
-    );
+    // If created, then we cannot withdraw through here anymore
+    let (group_contract, escrow) = match &enrollment.competition_info {
+        CompetitionInfo::Pending {
+            escrow,
+            group_contract,
+            ..
+        } => (group_contract, escrow),
+        _ => return Err(ContractError::AlreadyFinalized {}),
+    };
 
     // If there's an entry fee, create refund messages for each member
-    let refund_msgs = if let Some(entry_fee) = &entry.entry_fee {
-        members
-            .iter()
-            .map(|member| {
-                CosmosMsg::Bank(BankMsg::Send {
-                    to_address: member.to_string(),
-                    amount: vec![entry_fee.clone()],
-                })
-            })
-            .collect::<Vec<_>>()
+    let mut msgs = if let Some(entry_fee) = &enrollment.entry_fee {
+        vec![CosmosMsg::Wasm(WasmMsg::Execute {
+            contract_addr: escrow.to_string(),
+            msg: to_json_binary(&escrow::ExecuteMsg::EnrollmentWithdraw {
+                addrs: members.clone(),
+                entry_fee: entry_fee.clone(),
+            })?,
+            funds: vec![],
+        })]
     } else {
         vec![]
     };
 
     // Create group update message to remove all members
-    let group_msg = CosmosMsg::Wasm(WasmMsg::Execute {
-        contract_addr: entry.group_contract.to_string(),
+    msgs.push(CosmosMsg::Wasm(WasmMsg::Execute {
+        contract_addr: group_contract.to_string(),
         msg: to_json_binary(&group::ExecuteMsg::UpdateMembers {
             to_add: None,
             to_update: None,
-            to_remove: Some(members.iter().map(|m| m.to_string()).collect()),
+            to_remove: Some(members.clone()),
         })?,
         funds: vec![],
-    });
+    }));
 
     // Create attributes for each withdrawn member
-    let member_attributes: Vec<Attribute> = members
+    let member_attributes = members
         .into_iter()
         .map(|member| Attribute {
             key: "withdrawn_member".to_string(),
             value: member.to_string(),
         })
-        .collect();
+        .collect::<Vec<_>>();
 
     Ok(Response::new()
-        .add_message(group_msg)
-        .add_messages(refund_msgs)
+        .add_messages(msgs)
         .add_attribute("id", id.to_string())
         .add_attributes(member_attributes))
 }
@@ -625,9 +714,13 @@ pub fn set_rankings(
         enrollment.host == info.sender,
         ContractError::Unauthorized {}
     );
+    let group_contract = match &enrollment.competition_info {
+        CompetitionInfo::Pending { group_contract, .. } => group_contract,
+        CompetitionInfo::Existing { .. } => return Err(ContractError::AlreadyFinalized {}),
+    };
 
     let msg = WasmMsg::Execute {
-        contract_addr: enrollment.group_contract.to_string(),
+        contract_addr: group_contract.to_string(),
         msg: to_json_binary(&group::ExecuteMsg::UpdateMembers {
             to_add: None,
             to_update: Some(rankings),

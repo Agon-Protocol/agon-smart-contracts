@@ -8,18 +8,33 @@ use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 use cw_utils::Expiration;
 
 #[cw_serde]
-pub struct EnrollmentEntry {
+pub struct LegacyEnrollmentEntry {
     pub min_members: Option<Uint64>,
     pub max_members: Uint64,
     pub entry_fee: Option<Coin>,
     pub expiration: Expiration,
     pub has_triggered_expiration: bool,
-    pub competition_info: CompetitionInfo,
+    pub competition_info: LegacyCompetitionInfo,
     pub competition_type: CompetitionType,
     pub host: Addr,
     pub category_id: Option<Uint128>,
     pub competition_module: Addr,
     pub group_contract: Addr,
+    pub required_team_size: Option<u32>,
+}
+
+#[cw_serde]
+pub struct EnrollmentEntry {
+    pub min_members: Option<Uint64>,
+    pub max_members: Uint64,
+    pub entry_fee: Option<Coin>,
+    pub expiration: Expiration,
+    pub has_finalized: bool,
+    pub competition_info: CompetitionInfo,
+    pub competition_type: CompetitionType,
+    pub host: Addr,
+    pub category_id: Option<Uint128>,
+    pub competition_module: Addr,
     pub required_team_size: Option<u32>,
 }
 
@@ -32,26 +47,27 @@ pub struct EnrollmentEntryResponse {
     pub max_members: Uint64,
     pub entry_fee: Option<Coin>,
     pub expiration: Expiration,
-    pub has_triggered_expiration: bool,
+    pub has_finalized: bool,
     pub competition_info: CompetitionInfoResponse,
     pub competition_type: CompetitionType,
     pub host: Addr,
     pub is_expired: bool,
     pub competition_module: Addr,
-    pub group_contract: Addr,
     pub require_team_size: Option<u32>,
 }
 
 #[cw_serde]
 pub struct CompetitionInfoResponse {
-    name: String,
-    description: String,
-    expiration: Expiration,
-    rules: Option<Vec<String>>,
-    rulesets: Option<Vec<Uint128>>,
-    banner: Option<String>,
-    additional_layered_fees: Option<Vec<FeeInformation<String>>>,
-    competition_id: Option<Uint128>,
+    pub name: String,
+    pub description: String,
+    pub expiration: Expiration,
+    pub rules: Option<Vec<String>>,
+    pub rulesets: Option<Vec<Uint128>>,
+    pub banner: Option<String>,
+    pub additional_layered_fees: Option<Vec<FeeInformation<Addr>>>,
+    pub competition_id: Option<Uint128>,
+    pub escrow: Addr,
+    pub group_contract: Addr,
 }
 
 impl EnrollmentEntry {
@@ -61,8 +77,11 @@ impl EnrollmentEntry {
         block: &BlockInfo,
         id: Uint128,
     ) -> StdResult<EnrollmentEntryResponse> {
+        let competition_info = self
+            .competition_info
+            .into_response(deps, &self.competition_module)?;
         let current_members: Uint64 = deps.querier.query_wasm_smart(
-            self.group_contract.to_string(),
+            competition_info.group_contract.to_string(),
             &group::QueryMsg::MembersCount {},
         )?;
         let is_expired = self.expiration.is_expired(block);
@@ -75,15 +94,12 @@ impl EnrollmentEntry {
             max_members: self.max_members,
             entry_fee: self.entry_fee,
             expiration: self.expiration,
-            has_triggered_expiration: self.has_triggered_expiration,
-            competition_info: self
-                .competition_info
-                .into_response(deps, &self.competition_module)?,
+            has_finalized: self.has_finalized,
+            competition_info,
             competition_type: self.competition_type,
             host: self.host,
             is_expired,
             competition_module: self.competition_module,
-            group_contract: self.group_contract,
             require_team_size: self.required_team_size,
         })
     }
@@ -116,6 +132,22 @@ impl fmt::Display for CompetitionType {
 }
 
 #[cw_serde]
+pub enum LegacyCompetitionInfo {
+    Pending {
+        name: String,
+        description: String,
+        expiration: Expiration,
+        rules: Option<Vec<String>>,
+        rulesets: Option<Vec<Uint128>>,
+        banner: Option<String>,
+        additional_layered_fees: Option<Vec<FeeInformation<Addr>>>,
+    },
+    Existing {
+        id: Uint128,
+    },
+}
+
+#[cw_serde]
 pub enum CompetitionInfo {
     Pending {
         name: String,
@@ -124,7 +156,9 @@ pub enum CompetitionInfo {
         rules: Option<Vec<String>>,
         rulesets: Option<Vec<Uint128>>,
         banner: Option<String>,
-        additional_layered_fees: Option<Vec<FeeInformation<String>>>,
+        additional_layered_fees: Option<Vec<FeeInformation<Addr>>>,
+        escrow: Addr,
+        group_contract: Addr,
     },
     Existing {
         id: Uint128,
@@ -146,6 +180,8 @@ impl CompetitionInfo {
                 rulesets,
                 banner,
                 additional_layered_fees,
+                group_contract,
+                escrow,
             } => CompetitionInfoResponse {
                 name,
                 description,
@@ -155,6 +191,8 @@ impl CompetitionInfo {
                 banner,
                 additional_layered_fees,
                 competition_id: None,
+                escrow,
+                group_contract,
             },
             CompetitionInfo::Existing { id } => {
                 let competition = deps
@@ -177,8 +215,10 @@ impl CompetitionInfo {
                     rulesets: competition.rulesets,
                     banner: competition.banner,
                     expiration: competition.expiration,
-                    additional_layered_fees: None, // We don't need to know this information here, because it will be on the escrow
+                    additional_layered_fees: competition.fees,
                     competition_id: Some(id),
+                    escrow: competition.escrow,
+                    group_contract: competition.group_contract,
                 }
             }
         })
@@ -217,12 +257,13 @@ pub fn enrollment_entries<'a>() -> IndexedMap<'a, u128, EnrollmentEntry, Enrollm
 pub const ENROLLMENT_COUNT: Item<Uint128> = Item::new("enrollment_count");
 /// Stores the module address and enrollment id to process in a reply
 pub const TEMP_ENROLLMENT_INFO: Item<EnrollmentInfo> = Item::new("temp_enrollment_info");
-// Store this for migration - deleted after migration
-pub const ENROLLMENT_MEMBERS: Map<(u128, &Addr), Empty> = Map::new("enrollment_members");
 
 #[cw_serde]
 pub struct EnrollmentInfo {
     pub module_addr: Addr,
     pub enrollment_id: u128,
-    pub amount: Option<Coin>,
+    pub escrow_addr: Addr,
 }
+
+/// MIGRATIONS
+pub const LEGACY_ENROLLMENTS: Map<u128, LegacyEnrollmentEntry> = Map::new("enrollment_entries");

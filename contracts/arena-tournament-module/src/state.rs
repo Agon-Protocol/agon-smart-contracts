@@ -28,6 +28,7 @@ pub struct TournamentExt {
 }
 
 #[cw_serde]
+#[derive(Copy)]
 pub enum EliminationType {
     SingleElimination { play_third_place_match: bool },
     DoubleElimination,

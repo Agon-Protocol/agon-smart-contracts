@@ -131,7 +131,7 @@ impl<Chain: CwEnv> cw_orch::contract::Deploy<Chain> for Arena<Chain> {
                                             name: "Other Category".to_string(),
                                         },
                                     ]),
-                                    tax: Decimal::from_ratio(5u128, 100u128),
+                                    tax: Decimal::percent(5),
                                     tax_configuration: TaxConfiguration {
                                         cw20_msg: None,
                                         cw721_msg: None,
@@ -245,11 +245,19 @@ impl<Chain: CwEnv> cw_orch::contract::Deploy<Chain> for Arena<Chain> {
 
     fn load_from(chain: Chain) -> Result<Self, Self::Error> {
         let arena = Self::new(chain);
+
         Ok(arena)
     }
 
     fn deployed_state_file_path() -> Option<String> {
-        None
+        let crate_path = env!("CARGO_MANIFEST_DIR");
+
+        Some(
+            std::path::PathBuf::from(crate_path)
+                .join("state.json")
+                .display()
+                .to_string(),
+        )
     }
 
     fn get_contracts_mut(

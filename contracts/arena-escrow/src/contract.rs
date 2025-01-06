@@ -1,6 +1,6 @@
 use crate::{
     execute, migrate, query,
-    state::{self, DUE, INITIAL_DUE, IS_LOCKED},
+    state::{self, DUE, ENROLLMENT_CONTRACT, INITIAL_DUE, IS_LOCKED},
     ContractError,
 };
 use arena_interface::escrow::{ExecuteMsg, InstantiateMsg, MigrateMsg, QueryMsg};
@@ -22,7 +22,7 @@ pub fn instantiate(
     msg: InstantiateMsg,
 ) -> Result<Response, ContractError> {
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    instantiate_contract(deps, &info, msg.dues)?;
+    instantiate_contract(deps, &info, msg.dues, msg.is_enrollment)?;
 
     Ok(Response::default())
 }
@@ -31,10 +31,16 @@ pub fn instantiate_contract(
     deps: DepsMut,
     info: &MessageInfo,
     dues: Vec<MemberBalanceUnchecked>,
+    is_enrollment: bool,
 ) -> Result<(), ContractError> {
     cw_ownable::initialize_owner(deps.storage, deps.api, Some(info.sender.as_str()))?;
 
-    IS_LOCKED.save(deps.storage, &false)?;
+    if is_enrollment {
+        ENROLLMENT_CONTRACT.save(deps.storage, &info.sender)?;
+        IS_LOCKED.save(deps.storage, &true)?;
+    } else {
+        IS_LOCKED.save(deps.storage, &false)?;
+    }
     for member_balance in dues {
         let member_balance = member_balance.into_checked(deps.as_ref())?;
 
@@ -66,6 +72,9 @@ pub fn execute(
             cw20_msg,
             cw721_msg,
         } => execute::withdraw(deps, info, cw20_msg, cw721_msg),
+        ExecuteMsg::EnrollmentWithdraw { addrs, entry_fee } => {
+            execute::enrollment_withdraw(deps, info, addrs, entry_fee)
+        }
         ExecuteMsg::Receive(cw20_receive_msg) => {
             execute::receive_cw20(deps, info, cw20_receive_msg)
         }
@@ -85,7 +94,10 @@ pub fn execute(
             activation_height,
             group_contract,
         ),
-        ExecuteMsg::Lock { value } => execute::lock(deps, info, value),
+        ExecuteMsg::Lock {
+            value,
+            transfer_ownership,
+        } => execute::lock(deps, info, value, transfer_ownership),
         ExecuteMsg::UpdateOwnership(action) => {
             let ownership = cw_ownable::update_ownership(deps, &env.block, &info.sender, action)?;
             Ok(Response::new().add_attributes(ownership.into_attributes()))

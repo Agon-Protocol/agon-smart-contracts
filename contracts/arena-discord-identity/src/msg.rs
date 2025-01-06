@@ -1,5 +1,5 @@
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Coin, Uint64};
+use cosmwasm_std::{Coin, Uint128, Uint64};
 
 #[cw_serde]
 pub struct InstantiateMsg {
@@ -35,12 +35,15 @@ pub enum QueryMsg {
     ConnectedWallets { discord_id: Uint64 },
     #[returns(Vec<DiscordConnection>)]
     DiscordConnections { addr: String },
+    #[returns(Uint128)]
+    UserCount {},
 }
 
 #[cw_serde]
 pub enum MigrateMsg {
     FromCompatible {},
     SetHasReceived {},
+    SetUserCount {},
 }
 
 #[cw_serde]

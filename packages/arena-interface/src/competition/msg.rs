@@ -36,23 +36,13 @@ pub enum ExecuteBase<ExecuteExt, CompetitionInstantiateExt> {
         distribution: Option<Distribution<String>>,
     },
     ActivateCompetition {},
-    AddCompetitionHook {
-        competition_id: Uint128,
-    },
-    RemoveCompetitionHook {
-        competition_id: Uint128,
-    },
-    ExecuteCompetitionHook {
-        competition_id: Uint128,
-        distribution: Option<Distribution<String>>,
-    },
     CreateCompetition {
         /// The competition's host
         /// Defaults to info.sender
         /// This can only be overridden by valid competition enrollment modules
         host: Option<String>,
         category_id: Option<Uint128>,
-        escrow: Option<EscrowInstantiateInfo>,
+        escrow: EscrowContractInfo,
         name: String,
         description: String,
         expiration: Expiration,
@@ -154,15 +144,27 @@ where
 }
 
 #[cw_serde]
-pub struct EscrowInstantiateInfo {
-    /// Code ID of the contract to be instantiated.
-    pub code_id: u64,
-    /// Instantiate message to be used to create the contract.
-    pub msg: Binary,
-    /// Label for the instantiated contract.
-    pub label: String,
-    /// Optional additional layered fees
-    pub additional_layered_fees: Option<Vec<FeeInformation<String>>>,
+pub enum MigrateBase {
+    FromCompatible {},
+    FromV2_2 { escrow_id: u64 },
+}
+
+#[cw_serde]
+pub enum EscrowContractInfo {
+    Existing {
+        addr: String,
+        additional_layered_fees: Option<Vec<FeeInformation<String>>>,
+    },
+    New {
+        /// Code ID of the contract to be instantiated.
+        code_id: u64,
+        /// Instantiate message to be used to create the contract.
+        msg: Binary,
+        /// Label for the instantiated contract.
+        label: String,
+        /// Optional additional layered fees
+        additional_layered_fees: Option<Vec<FeeInformation<String>>>,
+    },
 }
 
 #[cw_serde]
@@ -170,12 +172,6 @@ pub enum CompetitionsFilter {
     CompetitionStatus { status: CompetitionStatus },
     Category { id: Option<Uint128> },
     Host(String),
-}
-
-#[cw_serde]
-pub enum HookDirection {
-    Incoming,
-    Outgoing,
 }
 
 pub trait ToCompetitionExt<T> {

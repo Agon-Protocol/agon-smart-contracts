@@ -43,4 +43,7 @@ pub enum ContractError {
 
     #[error("Unauthorized")]
     Unauthorized {},
+
+    #[error("Cannot withdraw directly from enrollment contract")]
+    EnrollmentWithdraw {},
 }

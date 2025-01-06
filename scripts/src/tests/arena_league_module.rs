@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use arena_interface::competition::msg::{
-    EscrowInstantiateInfo, ExecuteBaseFns as _, QueryBaseFns as _,
+    EscrowContractInfo, ExecuteBaseFns as _, QueryBaseFns as _,
 };
 use arena_interface::competition::stats::{
     MemberStatsMsg, StatAggregationType, StatMsg, StatType, StatValue, StatValueType,
@@ -40,6 +40,25 @@ fn test_create_league() -> anyhow::Result<()> {
     // Create a league
     let res = arena.arena_league_module.create_competition(
         "A test league".to_string(),
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: teams
+                    .iter()
+                    .map(|team| MemberBalanceUnchecked {
+                        addr: team.to_string(),
+                        balance: BalanceUnchecked {
+                            native: Some(vec![Coin::new(1000, DENOM)]),
+                            cw20: None,
+                            cw721: None,
+                        },
+                    })
+                    .collect(),
+                is_enrollment: false,
+            })?,
+            label: "League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -65,24 +84,6 @@ fn test_create_league() -> anyhow::Result<()> {
         "Test League".to_string(),
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: teams
-                    .iter()
-                    .map(|team| MemberBalanceUnchecked {
-                        addr: team.to_string(),
-                        balance: BalanceUnchecked {
-                            native: Some(vec![Coin::new(1000, DENOM)]),
-                            cw20: None,
-                            cw721: None,
-                        },
-                    })
-                    .collect(),
-            })?,
-            label: "League Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["League Rule".to_string()]),
         None,
@@ -100,6 +101,15 @@ fn test_create_league() -> anyhow::Result<()> {
     // Error - attempt to create a league with only one team
     let result = arena.arena_league_module.create_competition(
         "Invalid league",
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: vec![],
+                is_enrollment: false,
+            })?,
+            label: "League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -121,7 +131,6 @@ fn test_create_league() -> anyhow::Result<()> {
         "Invalid League",
         None,
         Some(Uint128::one()),
-        None,
         None,
         Some(vec!["Invalid League Rule".to_string()]),
         None,
@@ -154,6 +163,25 @@ fn test_process_league_matches() -> anyhow::Result<()> {
     // Create a league
     let res = arena.arena_league_module.create_competition(
         "A test league".to_string(),
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: teams
+                    .iter()
+                    .map(|team| MemberBalanceUnchecked {
+                        addr: team.to_string(),
+                        balance: BalanceUnchecked {
+                            native: Some(vec![Coin::new(1000, DENOM)]),
+                            cw20: None,
+                            cw721: None,
+                        },
+                    })
+                    .collect(),
+                is_enrollment: false,
+            })?,
+            label: "League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -179,24 +207,6 @@ fn test_process_league_matches() -> anyhow::Result<()> {
         "Test League".to_string(),
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: teams
-                    .iter()
-                    .map(|team| MemberBalanceUnchecked {
-                        addr: team.to_string(),
-                        balance: BalanceUnchecked {
-                            native: Some(vec![Coin::new(1000, DENOM)]),
-                            cw20: None,
-                            cw721: None,
-                        },
-                    })
-                    .collect(),
-            })?,
-            label: "League Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["League Rule".to_string()]),
         None,
@@ -346,6 +356,25 @@ fn test_add_point_adjustments() -> anyhow::Result<()> {
     // Create a league
     let res = arena.arena_league_module.create_competition(
         "A test league".to_string(),
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: teams
+                    .iter()
+                    .map(|team| MemberBalanceUnchecked {
+                        addr: team.to_string(),
+                        balance: BalanceUnchecked {
+                            native: Some(vec![Coin::new(1000, DENOM)]),
+                            cw20: None,
+                            cw721: None,
+                        },
+                    })
+                    .collect(),
+                is_enrollment: false,
+            })?,
+            label: "League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -371,24 +400,6 @@ fn test_add_point_adjustments() -> anyhow::Result<()> {
         "Test League".to_string(),
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: teams
-                    .iter()
-                    .map(|team| MemberBalanceUnchecked {
-                        addr: team.to_string(),
-                        balance: BalanceUnchecked {
-                            native: Some(vec![Coin::new(1000, DENOM)]),
-                            cw20: None,
-                            cw721: None,
-                        },
-                    })
-                    .collect(),
-            })?,
-            label: "League Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["League Rule".to_string()]),
         None,
@@ -471,6 +482,25 @@ fn test_create_league_with_odd_number_of_teams() -> anyhow::Result<()> {
 
     let res = arena.arena_league_module.create_competition(
         "Odd number league",
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: teams
+                    .iter()
+                    .map(|team| MemberBalanceUnchecked {
+                        addr: team.to_string(),
+                        balance: BalanceUnchecked {
+                            native: Some(vec![Coin::new(1000, DENOM)]),
+                            cw20: None,
+                            cw721: None,
+                        },
+                    })
+                    .collect(),
+                is_enrollment: false,
+            })?,
+            label: "Odd League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -496,24 +526,6 @@ fn test_create_league_with_odd_number_of_teams() -> anyhow::Result<()> {
         "Odd League",
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: teams
-                    .iter()
-                    .map(|team| MemberBalanceUnchecked {
-                        addr: team.to_string(),
-                        balance: BalanceUnchecked {
-                            native: Some(vec![Coin::new(1000, DENOM)]),
-                            cw20: None,
-                            cw721: None,
-                        },
-                    })
-                    .collect(),
-            })?,
-            label: "Odd League Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["Odd League Rule".to_string()]),
         None,
@@ -548,6 +560,25 @@ fn test_process_league_with_ties() -> anyhow::Result<()> {
 
     let res = arena.arena_league_module.create_competition(
         "Tie league",
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: teams
+                    .iter()
+                    .map(|team| MemberBalanceUnchecked {
+                        addr: team.to_string(),
+                        balance: BalanceUnchecked {
+                            native: Some(vec![Coin::new(1000, DENOM)]),
+                            cw20: None,
+                            cw721: None,
+                        },
+                    })
+                    .collect(),
+                is_enrollment: false,
+            })?,
+            label: "Tie League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -574,24 +605,6 @@ fn test_process_league_with_ties() -> anyhow::Result<()> {
         "Tie League",
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: teams
-                    .iter()
-                    .map(|team| MemberBalanceUnchecked {
-                        addr: team.to_string(),
-                        balance: BalanceUnchecked {
-                            native: Some(vec![Coin::new(1000, DENOM)]),
-                            cw20: None,
-                            cw721: None,
-                        },
-                    })
-                    .collect(),
-            })?,
-            label: "Tie League Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["Tie League Rule".to_string()]),
         None,
@@ -740,6 +753,25 @@ fn test_update_distribution() -> anyhow::Result<()> {
 
     arena.arena_league_module.create_competition(
         "Distribution league",
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: teams
+                    .iter()
+                    .map(|team| MemberBalanceUnchecked {
+                        addr: team.to_string(),
+                        balance: BalanceUnchecked {
+                            native: Some(vec![Coin::new(1000, DENOM)]),
+                            cw20: None,
+                            cw721: None,
+                        },
+                    })
+                    .collect(),
+                is_enrollment: false,
+            })?,
+            label: "Distribution League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -766,24 +798,6 @@ fn test_update_distribution() -> anyhow::Result<()> {
         "Distribution League",
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: teams
-                    .iter()
-                    .map(|team| MemberBalanceUnchecked {
-                        addr: team.to_string(),
-                        balance: BalanceUnchecked {
-                            native: Some(vec![Coin::new(1000, DENOM)]),
-                            cw20: None,
-                            cw721: None,
-                        },
-                    })
-                    .collect(),
-            })?,
-            label: "Distribution League Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["Distribution League Rule".to_string()]),
         None,
@@ -834,6 +848,15 @@ fn test_create_huge_league() -> anyhow::Result<()> {
         .collect();
     let result = arena.arena_league_module.create_competition(
         "Huge League",
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: vec![],
+                is_enrollment: false,
+            })?,
+            label: "League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -858,7 +881,6 @@ fn test_create_huge_league() -> anyhow::Result<()> {
         None,
         None,
         None,
-        None,
     );
 
     assert!(result.is_ok());
@@ -879,6 +901,25 @@ fn test_process_matches_out_of_order() -> anyhow::Result<()> {
 
     arena.arena_league_module.create_competition(
         "Out of Order League",
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: teams
+                    .iter()
+                    .map(|team| MemberBalanceUnchecked {
+                        addr: team.to_string(),
+                        balance: BalanceUnchecked {
+                            native: Some(vec![Coin::new(1000, DENOM)]),
+                            cw20: None,
+                            cw721: None,
+                        },
+                    })
+                    .collect(),
+                is_enrollment: false,
+            })?,
+            label: "Out of Order League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -905,24 +946,6 @@ fn test_process_matches_out_of_order() -> anyhow::Result<()> {
         "Out of Order League",
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: teams
-                    .iter()
-                    .map(|team| MemberBalanceUnchecked {
-                        addr: team.to_string(),
-                        balance: BalanceUnchecked {
-                            native: Some(vec![Coin::new(1000, DENOM)]),
-                            cw20: None,
-                            cw721: None,
-                        },
-                    })
-                    .collect(),
-            })?,
-            label: "Out of Order League Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["Out of Order League Rule".to_string()]),
         None,
@@ -962,6 +985,25 @@ fn test_multiple_point_adjustments() -> anyhow::Result<()> {
 
     let res = arena.arena_league_module.create_competition(
         "Multiple Adjustments League",
+        EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id()?,
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: teams
+                    .iter()
+                    .map(|team| MemberBalanceUnchecked {
+                        addr: team.to_string(),
+                        balance: BalanceUnchecked {
+                            native: Some(vec![Coin::new(1000, DENOM)]),
+                            cw20: None,
+                            cw721: None,
+                        },
+                    })
+                    .collect(),
+                is_enrollment: false,
+            })?,
+            label: "Multiple Adjustments League Escrow".to_string(),
+            additional_layered_fees: None,
+        },
         Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
@@ -988,24 +1030,6 @@ fn test_multiple_point_adjustments() -> anyhow::Result<()> {
         "Multiple Adjustments League",
         None,
         Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id()?,
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: teams
-                    .iter()
-                    .map(|team| MemberBalanceUnchecked {
-                        addr: team.to_string(),
-                        balance: BalanceUnchecked {
-                            native: Some(vec![Coin::new(1000, DENOM)]),
-                            cw20: None,
-                            cw721: None,
-                        },
-                    })
-                    .collect(),
-            })?,
-            label: "Multiple Adjustments League Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         None,
         Some(vec!["Multiple Adjustments League Rule".to_string()]),
         None,
@@ -1102,38 +1126,7 @@ fn test_league_tiebreaking_logic() -> anyhow::Result<()> {
     // Create a league
     let res = arena.arena_league_module.create_competition(
         "Test League".to_string(),
-        Expiration::AtHeight(1000000),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[
-                        team1.clone(),
-                        team2.clone(),
-                        team3.clone(),
-                        team4.clone(),
-                    ]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        LeagueInstantiateExt {
-            match_win_points: Uint64::new(3),
-            match_draw_points: Uint64::new(1),
-            match_lose_points: Uint64::zero(),
-            distribution: vec![
-                Decimal::percent(50),
-                Decimal::percent(30),
-                Decimal::percent(15),
-                Decimal::percent(5),
-            ],
-        },
-        "Tiebreaker Test League".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -1170,10 +1163,42 @@ fn test_league_tiebreaking_logic() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
             label: "League Escrow".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(1000000),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[
+                        team1.clone(),
+                        team2.clone(),
+                        team3.clone(),
+                        team4.clone(),
+                    ]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        LeagueInstantiateExt {
+            match_win_points: Uint64::new(3),
+            match_draw_points: Uint64::new(1),
+            match_lose_points: Uint64::zero(),
+            distribution: vec![
+                Decimal::percent(50),
+                Decimal::percent(30),
+                Decimal::percent(15),
+                Decimal::percent(5),
+            ],
+        },
+        "Tiebreaker Test League".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         Some(vec!["League Rule".to_string()]),
         None,
@@ -1527,38 +1552,7 @@ fn test_league_tiebreaking_logic_with_aggregates() -> anyhow::Result<()> {
     // Create a league
     let res = arena.arena_league_module.create_competition(
         "Test League with Aggregates".to_string(),
-        Expiration::AtHeight(1000000),
-        GroupContractInfo::New {
-            info: ModuleInstantiateInfo {
-                code_id: arena.arena_group.code_id()?,
-                msg: to_json_binary(&group::InstantiateMsg {
-                    members: teams_to_members(&[
-                        team1.clone(),
-                        team2.clone(),
-                        team3.clone(),
-                        team4.clone(),
-                    ]),
-                })?,
-                admin: None,
-                funds: vec![],
-                label: "Arena Group".to_string(),
-            },
-        },
-        LeagueInstantiateExt {
-            match_win_points: Uint64::new(3),
-            match_draw_points: Uint64::new(1),
-            match_lose_points: Uint64::zero(),
-            distribution: vec![
-                Decimal::percent(50),
-                Decimal::percent(30),
-                Decimal::percent(15),
-                Decimal::percent(5),
-            ],
-        },
-        "Tiebreaker Test League with Aggregates".to_string(),
-        None,
-        Some(Uint128::one()),
-        Some(EscrowInstantiateInfo {
+        EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
                 dues: vec![
@@ -1595,10 +1589,42 @@ fn test_league_tiebreaking_logic_with_aggregates() -> anyhow::Result<()> {
                         },
                     },
                 ],
+                is_enrollment: false,
             })?,
             label: "League Escrow with Aggregates".to_string(),
             additional_layered_fees: None,
-        }),
+        },
+        Expiration::AtHeight(1000000),
+        GroupContractInfo::New {
+            info: ModuleInstantiateInfo {
+                code_id: arena.arena_group.code_id()?,
+                msg: to_json_binary(&group::InstantiateMsg {
+                    members: teams_to_members(&[
+                        team1.clone(),
+                        team2.clone(),
+                        team3.clone(),
+                        team4.clone(),
+                    ]),
+                })?,
+                admin: None,
+                funds: vec![],
+                label: "Arena Group".to_string(),
+            },
+        },
+        LeagueInstantiateExt {
+            match_win_points: Uint64::new(3),
+            match_draw_points: Uint64::new(1),
+            match_lose_points: Uint64::zero(),
+            distribution: vec![
+                Decimal::percent(50),
+                Decimal::percent(30),
+                Decimal::percent(15),
+                Decimal::percent(5),
+            ],
+        },
+        "Tiebreaker Test League with Aggregates".to_string(),
+        None,
+        Some(Uint128::one()),
         None,
         Some(vec!["League Rule".to_string()]),
         None,

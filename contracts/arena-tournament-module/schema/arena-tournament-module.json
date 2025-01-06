@@ -1,6 +1,6 @@
 {
   "contract_name": "arena-tournament-module",
-  "contract_version": "2.2.0",
+  "contract_version": "2.3.0",
   "idl_version": "1.0.0",
   "instantiate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -89,79 +89,6 @@
       {
         "type": "object",
         "required": [
-          "add_competition_hook"
-        ],
-        "properties": {
-          "add_competition_hook": {
-            "type": "object",
-            "required": [
-              "competition_id"
-            ],
-            "properties": {
-              "competition_id": {
-                "$ref": "#/definitions/Uint128"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "type": "object",
-        "required": [
-          "remove_competition_hook"
-        ],
-        "properties": {
-          "remove_competition_hook": {
-            "type": "object",
-            "required": [
-              "competition_id"
-            ],
-            "properties": {
-              "competition_id": {
-                "$ref": "#/definitions/Uint128"
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "type": "object",
-        "required": [
-          "execute_competition_hook"
-        ],
-        "properties": {
-          "execute_competition_hook": {
-            "type": "object",
-            "required": [
-              "competition_id"
-            ],
-            "properties": {
-              "competition_id": {
-                "$ref": "#/definitions/Uint128"
-              },
-              "distribution": {
-                "anyOf": [
-                  {
-                    "$ref": "#/definitions/Distribution_for_String"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
-              }
-            },
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "type": "object",
-        "required": [
           "create_competition"
         ],
         "properties": {
@@ -169,6 +96,7 @@
             "type": "object",
             "required": [
               "description",
+              "escrow",
               "expiration",
               "group_contract",
               "instantiate_extension",
@@ -195,14 +123,7 @@
                 "type": "string"
               },
               "escrow": {
-                "anyOf": [
-                  {
-                    "$ref": "#/definitions/EscrowInstantiateInfo"
-                  },
-                  {
-                    "type": "null"
-                  }
-                ]
+                "$ref": "#/definitions/EscrowContractInfo"
               },
               "expiration": {
                 "$ref": "#/definitions/Expiration"
@@ -744,44 +665,87 @@
           }
         ]
       },
-      "EscrowInstantiateInfo": {
-        "type": "object",
-        "required": [
-          "code_id",
-          "label",
-          "msg"
-        ],
-        "properties": {
-          "additional_layered_fees": {
-            "description": "Optional additional layered fees",
-            "type": [
-              "array",
-              "null"
+      "EscrowContractInfo": {
+        "oneOf": [
+          {
+            "type": "object",
+            "required": [
+              "existing"
             ],
-            "items": {
-              "$ref": "#/definitions/FeeInformation_for_String"
-            }
-          },
-          "code_id": {
-            "description": "Code ID of the contract to be instantiated.",
-            "type": "integer",
-            "format": "uint64",
-            "minimum": 0.0
-          },
-          "label": {
-            "description": "Label for the instantiated contract.",
-            "type": "string"
-          },
-          "msg": {
-            "description": "Instantiate message to be used to create the contract.",
-            "allOf": [
-              {
-                "$ref": "#/definitions/Binary"
+            "properties": {
+              "existing": {
+                "type": "object",
+                "required": [
+                  "addr"
+                ],
+                "properties": {
+                  "additional_layered_fees": {
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/definitions/FeeInformation_for_String"
+                    }
+                  },
+                  "addr": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
               }
-            ]
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "new"
+            ],
+            "properties": {
+              "new": {
+                "type": "object",
+                "required": [
+                  "code_id",
+                  "label",
+                  "msg"
+                ],
+                "properties": {
+                  "additional_layered_fees": {
+                    "description": "Optional additional layered fees",
+                    "type": [
+                      "array",
+                      "null"
+                    ],
+                    "items": {
+                      "$ref": "#/definitions/FeeInformation_for_String"
+                    }
+                  },
+                  "code_id": {
+                    "description": "Code ID of the contract to be instantiated.",
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0.0
+                  },
+                  "label": {
+                    "description": "Label for the instantiated contract.",
+                    "type": "string"
+                  },
+                  "msg": {
+                    "description": "Instantiate message to be used to create the contract.",
+                    "allOf": [
+                      {
+                        "$ref": "#/definitions/Binary"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
           }
-        },
-        "additionalProperties": false
+        ]
       },
       "ExecuteExt": {
         "oneOf": [
@@ -1816,42 +1780,53 @@
   "migrate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
     "title": "MigrateMsg",
-    "oneOf": [
+    "anyOf": [
       {
-        "type": "object",
-        "required": [
-          "from_compatible"
-        ],
-        "properties": {
-          "from_compatible": {
-            "type": "object",
-            "additionalProperties": false
-          }
-        },
-        "additionalProperties": false
-      },
-      {
-        "type": "object",
-        "required": [
-          "with_group_address"
-        ],
-        "properties": {
-          "with_group_address": {
+        "$ref": "#/definitions/MigrateBase"
+      }
+    ],
+    "definitions": {
+      "MigrateBase": {
+        "oneOf": [
+          {
             "type": "object",
             "required": [
-              "group_contract"
+              "from_compatible"
             ],
             "properties": {
-              "group_contract": {
-                "type": "string"
+              "from_compatible": {
+                "type": "object",
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "from_v2_2"
+            ],
+            "properties": {
+              "from_v2_2": {
+                "type": "object",
+                "required": [
+                  "escrow_id"
+                ],
+                "properties": {
+                  "escrow_id": {
+                    "type": "integer",
+                    "format": "uint64",
+                    "minimum": 0.0
+                  }
+                },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false
           }
-        },
-        "additionalProperties": false
+        ]
       }
-    ]
+    }
   },
   "sudo": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -1969,6 +1944,7 @@
       "type": "object",
       "required": [
         "description",
+        "escrow",
         "expiration",
         "extension",
         "group_contract",
@@ -2000,14 +1976,7 @@
           "type": "string"
         },
         "escrow": {
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Addr"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "$ref": "#/definitions/Addr"
         },
         "expiration": {
           "$ref": "#/definitions/Expiration"
@@ -2323,6 +2292,7 @@
           "type": "object",
           "required": [
             "description",
+            "escrow",
             "expiration",
             "extension",
             "group_contract",
@@ -2354,14 +2324,7 @@
               "type": "string"
             },
             "escrow": {
-              "anyOf": [
-                {
-                  "$ref": "#/definitions/Addr"
-                },
-                {
-                  "type": "null"
-                }
-              ]
+              "$ref": "#/definitions/Addr"
             },
             "expiration": {
               "$ref": "#/definitions/Expiration"

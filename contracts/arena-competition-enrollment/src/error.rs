@@ -1,6 +1,6 @@
 use cosmwasm_std::{
-    CheckedFromRatioError, DecimalRangeExceeded, Instantiate2AddressError, OverflowError, StdError,
-    Uint128, Uint64,
+    CheckedFromRatioError, Coin, DecimalRangeExceeded, Instantiate2AddressError, OverflowError,
+    StdError, Uint64,
 };
 use cw_ownable::OwnershipError;
 use cw_utils::{Expiration, ParseReplyError, PaymentError};
@@ -32,7 +32,7 @@ pub enum ContractError {
     #[error("{0}")]
     Instantiate2AddressError(#[from] Instantiate2AddressError),
 
-    #[error("UnknownReplyId")]
+    #[error("Unknown reply ID {id}")]
     UnknownReplyId { id: u64 },
 
     #[error("Unauthorized")]
@@ -41,18 +41,18 @@ pub enum ContractError {
     #[error("Already enrolled")]
     AlreadyEnrolled {},
 
-    #[error("Cannot trigger creation with {current_members} members")]
-    TriggerFailed {
+    #[error("Cannot finalize with {current_members} members")]
+    FinalizeFailed {
         max_members: Uint64,
         current_members: Uint64,
         expiration: Expiration,
     },
 
-    #[error("Competition has already been generated or expired")]
-    AlreadyExpired {},
+    #[error("Competition has already been finalized")]
+    AlreadyFinalized {},
 
-    #[error("Entry fee was not paid")]
-    EntryFeeNotPaid { fee: Uint128 },
+    #[error("Entry fee {entry_fee} was not paid")]
+    EntryFeeNotPaid { entry_fee: Coin },
 
     #[error("Not enrolled")]
     NotEnrolled {},

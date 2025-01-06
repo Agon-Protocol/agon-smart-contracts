@@ -1,7 +1,7 @@
 use std::str::FromStr;
 
 use arena_interface::{
-    competition::msg::EscrowInstantiateInfo,
+    competition::msg::EscrowContractInfo,
     core::QueryExtFns as _,
     escrow::{ExecuteMsgFns as _, QueryMsgFns as _},
     group::{self, AddMemberMsg, GroupContractInfo},
@@ -1377,25 +1377,6 @@ fn create_competition_msg<Chain: ChainState>(
     Ok(ExecuteMsg::CreateCompetition {
         category_id,
         host: None,
-        escrow: Some(EscrowInstantiateInfo {
-            code_id: arena.arena_escrow.code_id().unwrap(),
-            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
-                dues: teams
-                    .iter()
-                    .map(|x| MemberBalanceUnchecked {
-                        addr: x.to_string(),
-                        balance: BalanceUnchecked {
-                            native: Some(coins(10_000u128, DENOM)),
-                            cw20: None,
-                            cw721: None,
-                        },
-                    })
-                    .collect(),
-            })
-            .unwrap(),
-            label: "Arena Escrow".to_string(),
-            additional_layered_fees: None,
-        }),
         name: "Competition".to_string(),
         description: "Competition description".to_string(),
         expiration: cw_utils::Expiration::Never {},
@@ -1424,6 +1405,26 @@ fn create_competition_msg<Chain: ChainState>(
                 funds: vec![],
                 label: "Arena Group".to_string(),
             },
+        },
+        escrow: EscrowContractInfo::New {
+            code_id: arena.arena_escrow.code_id().unwrap(),
+            msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
+                dues: teams
+                    .iter()
+                    .map(|x| MemberBalanceUnchecked {
+                        addr: x.to_string(),
+                        balance: BalanceUnchecked {
+                            native: Some(coins(10_000u128, DENOM)),
+                            cw20: None,
+                            cw721: None,
+                        },
+                    })
+                    .collect(),
+                is_enrollment: false,
+            })
+            .unwrap(),
+            label: "Arena Escrow".to_string(),
+            additional_layered_fees: None,
         },
     })
 }

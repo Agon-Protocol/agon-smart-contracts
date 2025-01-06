@@ -1,4 +1,4 @@
-use arena_interface::competition::msg::{ExecuteBase, QueryBase};
+use arena_interface::competition::msg::{ExecuteBase, MigrateBase, QueryBase};
 #[cfg(not(feature = "library"))]
 use cosmwasm_std::entry_point;
 use cosmwasm_std::{
@@ -143,17 +143,27 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn migrate(mut deps: DepsMut, _env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
+pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     let competition_module = CompetitionModule::default();
     let version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
+    let mut msgs = vec![];
     match msg {
-        MigrateMsg::FromCompatible {} => {
-            if version.major == 1 && version.minor < 7 {
-                competition_module.migrate_from_v1_6_to_v1_7(deps.branch())?;
+        MigrateMsg::Base(migrate_base) => match migrate_base {
+            MigrateBase::FromCompatible {} => {
+                if version.major == 1 && version.minor < 7 {
+                    competition_module.migrate_from_v1_6_to_v1_7(deps.branch())?;
+                }
             }
-        }
+            MigrateBase::FromV2_2 { escrow_id } => {
+                msgs.extend(competition_module.migrate_from_v2_2_to_v2_3(
+                    deps.branch(),
+                    env,
+                    escrow_id,
+                )?);
+            }
+        },
     }
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    Ok(Response::default())
+    Ok(Response::default().add_messages(msgs))
 }

@@ -1,6 +1,6 @@
 use crate::fees::FeeInformation;
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Binary;
+use cosmwasm_std::{Binary, Coin};
 use cw20::Cw20ReceiveMsg;
 use cw721::Cw721ReceiveMsg;
 #[allow(unused_imports)]
@@ -12,6 +12,7 @@ use cw_ownable::{cw_ownable_execute, cw_ownable_query};
 #[cw_serde]
 pub struct InstantiateMsg {
     pub dues: Vec<MemberBalanceUnchecked>,
+    pub is_enrollment: bool,
 }
 
 #[cw_ownable_execute]
@@ -22,11 +23,19 @@ pub enum ExecuteMsg {
         cw20_msg: Option<Binary>,
         cw721_msg: Option<Binary>,
     },
+    EnrollmentWithdraw {
+        /// The recipients
+        addrs: Vec<String>,
+        /// The enrollment entry fee
+        entry_fee: Coin,
+    },
     #[cw_orch(payable)]
     ReceiveNative {},
     Receive(Cw20ReceiveMsg),
     ReceiveNft(Cw721ReceiveMsg),
     Distribute {
+        /// How the escrow funds will be distributed
+        /// If none, the funds will be split evenly across members with the 1 seed receiving remainders
         distribution: Option<Distribution<String>>,
         /// Layered fees is an ordered list of fees to be applied before the distribution.
         /// The term layered refers to the implementation: Arena Tax -> Host Fee? -> Other Fee?
@@ -37,6 +46,7 @@ pub enum ExecuteMsg {
     },
     Lock {
         value: bool,
+        transfer_ownership: Option<TransferEscrowOwnershipMsg>,
     },
 }
 
@@ -81,6 +91,12 @@ pub struct DumpStateResponse {
     pub total_balance: Option<BalanceVerified>,
     pub balance: Option<BalanceVerified>,
     pub due: Option<BalanceVerified>,
+}
+
+#[cw_serde]
+pub struct TransferEscrowOwnershipMsg {
+    pub addr: String,
+    pub is_enrollment: bool,
 }
 
 #[cw_serde]

@@ -1,4 +1,6 @@
+pub use arena::*;
 use cw_orch::{anyhow, prelude::*};
+pub use dao_dao::*;
 use orch_interface::{
     arena_competition_enrollment::ArenaCompetitionEnrollmentContract,
     arena_core::ArenaCoreContract, arena_discord_identity::ArenaDiscordIdentityContract,
@@ -10,6 +12,11 @@ use orch_interface::{
     arena_wager_module::ArenaWagerModuleContract, dao_dao_core::DaoDaoCoreContract,
 };
 use std::env;
+
+mod arena;
+mod dao_dao;
+#[cfg(test)]
+mod tests;
 
 fn main() -> anyhow::Result<()> {
     dotenv::dotenv().ok();
@@ -125,13 +132,13 @@ fn deploy_to_network(network: Network, component: &DeployComponent) -> anyhow::R
     match component {
         DeployComponent::All => {
             deploy_core(&daemon)?;
-            deploy_dao_core(&daemon)?;
             deploy_tournament(&daemon)?;
             deploy_enrollment(&daemon)?;
-            deploy_token_gateway(&daemon)?;
             deploy_competition_modules(&daemon)?;
             deploy_group(&daemon)?;
-            deploy_identity(&daemon)?;
+            if matches!(network, Network::Mainnet) {
+                deploy_identity(&daemon)?;
+            }
             deploy_registry(&daemon)?;
             deploy_escrow(&daemon)?;
         }

@@ -1,7 +1,7 @@
 use crate::state::{EliminationType, MatchResult, TournamentExt};
 use arena_interface::{
     competition::{
-        msg::{ExecuteBase, InstantiateBase, QueryBase, ToCompetitionExt},
+        msg::{ExecuteBase, InstantiateBase, MigrateBase, QueryBase, ToCompetitionExt},
         state::{Competition, CompetitionResponse},
     },
     group,
@@ -53,8 +53,9 @@ pub struct MatchResultMsg {
 }
 
 #[cw_serde]
+#[serde(untagged)]
 pub enum MigrateMsg {
-    FromCompatible {},
+    Base(MigrateBase),
 }
 
 /// This is used to completely generate schema types
@@ -133,7 +134,7 @@ impl ToCompetitionExt<TournamentExt> for TournamentInstantiateExt {
 
         Ok(TournamentExt {
             distribution: self.distribution.clone(),
-            elimination_type: self.elimination_type.clone(),
+            elimination_type: self.elimination_type,
             total_matches: total_matches.into(),
             processed_matches: Uint128::zero(),
         })
