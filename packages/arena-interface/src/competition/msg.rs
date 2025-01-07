@@ -7,10 +7,9 @@ use crate::{
     group::{self},
 };
 use cosmwasm_schema::{cw_serde, schemars::JsonSchema, QueryResponses};
-use cosmwasm_std::{Addr, Binary, Deps, StdResult, Uint128};
+use cosmwasm_std::{Addr, Binary, Deps, StdResult, Timestamp, Uint128};
 use cw_balance::Distribution;
 use cw_ownable::{cw_ownable_execute, cw_ownable_query};
-use cw_utils::Expiration;
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 
@@ -45,7 +44,9 @@ pub enum ExecuteBase<ExecuteExt, CompetitionInstantiateExt> {
         escrow: EscrowContractInfo,
         name: String,
         description: String,
-        expiration: Expiration,
+        date: Timestamp,
+        /// Seconds after date that the competition is considered expired
+        duration: u64,
         rules: Option<Vec<String>>,
         rulesets: Option<Vec<Uint128>>,
         banner: Option<String>,
@@ -146,7 +147,7 @@ where
 #[cw_serde]
 pub enum MigrateBase {
     FromCompatible {},
-    FromV2_2 { escrow_id: u64 },
+    FromV2_3 {},
 }
 
 #[cw_serde]

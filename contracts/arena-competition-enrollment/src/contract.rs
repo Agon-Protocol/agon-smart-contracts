@@ -55,7 +55,7 @@ pub fn execute(
             min_members,
             max_members,
             entry_fee,
-            expiration,
+            duration_before,
             category_id,
             competition_info,
             competition_type,
@@ -69,7 +69,7 @@ pub fn execute(
             min_members,
             max_members,
             entry_fee,
-            expiration,
+            duration_before,
             category_id,
             competition_info,
             competition_type,
@@ -90,16 +90,16 @@ pub fn execute(
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]
-pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
+pub fn query(deps: Deps, _env: Env, msg: QueryMsg) -> StdResult<Binary> {
     match msg {
         QueryMsg::Enrollments {
             start_after,
             limit,
             filter,
-        } => to_json_binary(&query::enrollments(deps, env, start_after, limit, filter)?),
+        } => to_json_binary(&query::enrollments(deps, start_after, limit, filter)?),
         QueryMsg::Enrollment { enrollment_id } => {
             let entry = enrollment_entries().load(deps.storage, enrollment_id.u128())?;
-            to_json_binary(&entry.into_response(deps, &env.block, enrollment_id)?)
+            to_json_binary(&entry.into_response(deps, enrollment_id)?)
         }
         QueryMsg::Ownership {} => to_json_binary(&cw_ownable::get_ownership(deps.storage)?),
         QueryMsg::EnrollmentCount {} => to_json_binary(&query::enrollment_count(deps)?),
@@ -114,7 +114,6 @@ pub fn query(deps: Deps, env: Env, msg: QueryMsg) -> StdResult<Binary> {
 pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response, ContractError> {
     let _version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let mut msgs = vec![];
     match msg {
         MigrateMsg::FromCompatible {} => {}
         MigrateMsg::RemoveThirdPlaceMatch { enrollment_id } => {
@@ -146,17 +145,13 @@ pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response,
                 },
             )?;
         }
-        MigrateMsg::FromV2_2 { escrow_id } => {
-            msgs.extend(migrate::migrate_from_v2_2_to_v2_3(
-                deps.branch(),
-                env,
-                escrow_id,
-            )?);
+        MigrateMsg::FromV2_3 {} => {
+            migrate::migrate_from_v2_3_to_v2_3_1(deps.branch(), env)?;
         }
     };
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    Ok(Response::default().add_messages(msgs))
+    Ok(Response::default())
 }
 
 #[cfg_attr(not(feature = "library"), entry_point)]

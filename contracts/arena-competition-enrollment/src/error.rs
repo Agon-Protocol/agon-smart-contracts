@@ -3,7 +3,7 @@ use cosmwasm_std::{
     StdError, Uint64,
 };
 use cw_ownable::OwnershipError;
-use cw_utils::{Expiration, ParseReplyError, PaymentError};
+use cw_utils::{ParseReplyError, PaymentError};
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq)]
@@ -41,11 +41,10 @@ pub enum ContractError {
     #[error("Already enrolled")]
     AlreadyEnrolled {},
 
-    #[error("Cannot finalize with {current_members} members")]
+    #[error("Cannot finalize with {current_members}/{max_members} members before expiration")]
     FinalizeFailed {
         max_members: Uint64,
         current_members: Uint64,
-        expiration: Expiration,
     },
 
     #[error("Competition has already been finalized")]

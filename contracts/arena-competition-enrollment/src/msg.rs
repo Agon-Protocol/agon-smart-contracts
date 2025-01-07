@@ -1,7 +1,6 @@
 use arena_interface::{competition::msg::EscrowContractInfo, group::MemberMsg};
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Coin, Uint128, Uint64};
-use cw_utils::Expiration;
+use cosmwasm_std::{Coin, Timestamp, Uint128, Uint64};
 use dao_interface::state::ModuleInstantiateInfo;
 
 use crate::state::{CompetitionType, EnrollmentEntryResponse};
@@ -23,7 +22,8 @@ pub enum ExecuteMsg {
         max_members: Uint64,
         /// The entry fee of the competition
         entry_fee: Option<Coin>,
-        expiration: Expiration,
+        /// Seconds before the competition date until registration is expired
+        duration_before: u64,
         category_id: Option<Uint128>,
         competition_info: CompetitionInfoMsg,
         competition_type: CompetitionType,
@@ -58,7 +58,8 @@ pub enum ExecuteMsg {
 pub struct CompetitionInfoMsg {
     pub name: String,
     pub description: String,
-    pub expiration: Expiration,
+    pub date: Timestamp,
+    pub duration: u64,
     pub rules: Option<Vec<String>>,
     pub rulesets: Option<Vec<Uint128>>,
     pub banner: Option<String>,
@@ -95,7 +96,7 @@ pub enum QueryMsg {
 pub enum MigrateMsg {
     FromCompatible {},
     RemoveThirdPlaceMatch { enrollment_id: Uint128 },
-    FromV2_2 { escrow_id: u64 },
+    FromV2_3 {},
 }
 
 #[cw_serde]

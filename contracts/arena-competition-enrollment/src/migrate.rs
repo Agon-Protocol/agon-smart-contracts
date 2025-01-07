@@ -1,8 +1,5 @@
-use arena_interface::escrow;
-use cosmwasm_std::{
-    instantiate2_address, to_json_binary, CosmosMsg, DepsMut, Env, Order, StdResult, WasmMsg,
-};
-use sha2::{Digest as _, Sha256};
+use cosmwasm_std::{DepsMut, Env, Order, StdResult};
+use cw_utils::Expiration;
 
 use crate::{
     state::{
@@ -12,14 +9,7 @@ use crate::{
     ContractError,
 };
 
-pub fn migrate_from_v2_2_to_v2_3(
-    deps: DepsMut,
-    env: Env,
-    escrow_id: u64,
-) -> Result<Vec<CosmosMsg>, ContractError> {
-    let mut msgs = vec![];
-    let code_info = deps.querier.query_wasm_code_info(escrow_id)?;
-
+pub fn migrate_from_v2_3_to_v2_3_1(deps: DepsMut, env: Env) -> Result<(), ContractError> {
     for (enrollment_id, enrollment) in LEGACY_ENROLLMENTS
         .range(deps.storage, None, None, Order::Ascending)
         .collect::<StdResult<Vec<_>>>()?
@@ -33,38 +23,25 @@ pub fn migrate_from_v2_2_to_v2_3(
                 rulesets,
                 banner,
                 additional_layered_fees,
+                escrow,
+                group_contract,
             } => {
-                let binding = format!("{}{}{}", "enrollments", env.block.height, enrollment_id);
-                let salt: [u8; 32] = Sha256::digest(binding.as_bytes()).into();
-                let canonical_creator =
-                    deps.api.addr_canonicalize(env.contract.address.as_str())?;
-                let canonical_addr =
-                    instantiate2_address(&code_info.checksum, &canonical_creator, &salt)?;
-
-                msgs.push(CosmosMsg::Wasm(WasmMsg::Instantiate2 {
-                    admin: Some(env.contract.address.to_string()),
-                    code_id: escrow_id,
-                    label: "Arena Escrow".to_string(),
-                    msg: to_json_binary(&escrow::InstantiateMsg {
-                        dues: vec![],
-                        is_enrollment: true,
-                    })?,
-                    funds: vec![],
-                    salt: salt.into(),
-                }));
-
-                let escrow = deps.api.addr_humanize(&canonical_addr)?;
+                let date = match expiration {
+                    Expiration::AtTime(date) => date,
+                    _ => env.block.time,
+                };
 
                 CompetitionInfo::Pending {
                     name,
                     description,
-                    expiration,
+                    date,
+                    duration: 3600,
                     rules,
                     rulesets,
                     banner,
                     additional_layered_fees,
                     escrow,
-                    group_contract: enrollment.group_contract,
+                    group_contract,
                 }
             }
             LegacyCompetitionInfo::Existing { id } => CompetitionInfo::Existing { id },
@@ -74,8 +51,8 @@ pub fn migrate_from_v2_2_to_v2_3(
             min_members: enrollment.min_members,
             max_members: enrollment.max_members,
             entry_fee: enrollment.entry_fee,
-            expiration: enrollment.expiration,
-            has_finalized: enrollment.has_triggered_expiration,
+            duration_before: 86400,
+            has_finalized: enrollment.has_finalized,
             competition_info,
             competition_type: enrollment.competition_type,
             host: enrollment.host,
@@ -92,5 +69,5 @@ pub fn migrate_from_v2_2_to_v2_3(
         )?;
     }
 
-    Ok(msgs)
+    Ok(())
 }

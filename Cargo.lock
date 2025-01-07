@@ -128,7 +128,7 @@ checksum = "c1fd03a028ef38ba2276dce7e33fcd6369c158a1bca17946c4b1b701891c1ff7"
 
 [[package]]
 name = "arena-competition-enrollment"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "arena-league-module",
@@ -156,7 +156,7 @@ dependencies = [
 
 [[package]]
 name = "arena-core"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "cosmwasm-schema",
@@ -176,7 +176,7 @@ dependencies = [
 
 [[package]]
 name = "arena-discord-identity"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -189,7 +189,7 @@ dependencies = [
 
 [[package]]
 name = "arena-escrow"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "cosmwasm-schema",
@@ -209,7 +209,7 @@ dependencies = [
 
 [[package]]
 name = "arena-group"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "cosmwasm-schema",
@@ -224,7 +224,7 @@ dependencies = [
 
 [[package]]
 name = "arena-interface"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -243,7 +243,7 @@ dependencies = [
 
 [[package]]
 name = "arena-league-module"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "cosmwasm-schema",
@@ -262,7 +262,7 @@ dependencies = [
 
 [[package]]
 name = "arena-payment-registry"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "cosmwasm-schema",
@@ -279,7 +279,7 @@ dependencies = [
 
 [[package]]
 name = "arena-token-gateway"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -299,7 +299,7 @@ dependencies = [
 
 [[package]]
 name = "arena-tournament-module"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "cosmwasm-schema",
@@ -319,7 +319,7 @@ dependencies = [
 
 [[package]]
 name = "arena-wager-module"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "cosmwasm-schema",
@@ -1174,7 +1174,7 @@ dependencies = [
 
 [[package]]
 name = "cw-balance"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "cosmwasm-schema",
  "cosmwasm-std",
@@ -1187,7 +1187,7 @@ dependencies = [
 
 [[package]]
 name = "cw-competition-base"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "cosmwasm-schema",
@@ -3290,7 +3290,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
 name = "glicko_2"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-interface",
  "cosmwasm-schema",
@@ -4080,7 +4080,7 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "orch-interface"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "abstract-cw4-group",
  "arena-competition-enrollment",
@@ -4838,7 +4838,7 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "scripts"
-version = "2.3.0"
+version = "2.3.1"
 dependencies = [
  "arena-competition-enrollment",
  "arena-core",

@@ -4,15 +4,17 @@ use arena_interface::{
     escrow::{self},
     fees::FeeInformation,
     group::{self, GroupContractInfo, MemberMsg},
+    helpers::is_expired,
 };
 use arena_league_module::msg::LeagueInstantiateExt;
 use arena_tournament_module::{msg::TournamentInstantiateExt, state::EliminationType};
 use arena_wager_module::msg::WagerInstantiateExt;
 use cosmwasm_std::{
-    ensure, instantiate2_address, to_json_binary, Addr, Attribute, Coin, CosmosMsg, DepsMut, Env,
-    MessageInfo, Response, StdError, StdResult, SubMsg, Uint128, Uint64, WasmMsg,
+    ensure, instantiate2_address, to_json_binary, Addr, Attribute, BlockInfo, Coin, CosmosMsg,
+    DepsMut, Env, MessageInfo, Response, StdError, StdResult, SubMsg, Timestamp, Uint128, Uint64,
+    WasmMsg,
 };
-use cw_utils::{must_pay, Expiration};
+use cw_utils::must_pay;
 use dao_interface::{state::ModuleInstantiateInfo, voting::VotingPowerAtHeightResponse};
 use itertools::Itertools as _;
 use sha2::{Digest, Sha256};
@@ -30,6 +32,14 @@ pub const FINALIZE_COMPETITION_REPLY_ID: u64 = 1;
 /// Team size is limited to cw4-group's max size limit
 const TEAM_SIZE_LIMIT: u32 = 30;
 
+pub(crate) fn is_enrollment_expired(
+    current: &BlockInfo,
+    date: &Timestamp,
+    duration_before: u64,
+) -> bool {
+    current.time > date.minus_seconds(duration_before)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn create_enrollment(
     deps: DepsMut,
@@ -38,7 +48,7 @@ pub fn create_enrollment(
     min_members: Option<Uint64>,
     max_members: Uint64,
     entry_fee: Option<Coin>,
-    expiration: Expiration,
+    duration_before: u64,
     category_id: Option<Uint128>,
     competition_info: CompetitionInfoMsg,
     competition_type: CompetitionType,
@@ -47,16 +57,22 @@ pub fn create_enrollment(
     escrow_contract_info: EscrowContractInfo,
 ) -> Result<Response, ContractError> {
     ensure!(
-        !expiration.is_expired(&env.block),
+        !is_expired(
+            &env.block,
+            &competition_info.date,
+            competition_info.duration
+        ),
         ContractError::StdError(StdError::generic_err(
             "Cannot create an expired competition enrollment"
         ))
     );
     ensure!(
-        expiration < competition_info.expiration,
-        ContractError::StdError(StdError::generic_err(
-            "Cannot have an enrollment with expiration before the competition's expiration"
-        ))
+        !is_enrollment_expired(
+            &env.block,
+            &competition_info.date,
+            competition_info.duration
+        ),
+        ContractError::StdError(StdError::generic_err("Cannot create expired enrollment"))
     );
 
     let min_min_members = get_min_min_members(&competition_type);
@@ -222,12 +238,13 @@ pub fn create_enrollment(
             min_members,
             max_members,
             entry_fee,
-            expiration,
+            duration_before,
             has_finalized: false,
             competition_info: CompetitionInfo::Pending {
                 name: competition_info.name,
                 description: competition_info.description,
-                expiration: competition_info.expiration,
+                date: competition_info.date,
+                duration: competition_info.duration,
                 rules: competition_info.rules,
                 rulesets: competition_info.rulesets,
                 banner: competition_info.banner,
@@ -269,12 +286,13 @@ pub fn finalize(
     );
 
     // Get competition info reference and validate
-    let (group_contract, escrow) = match &enrollment.competition_info {
+    let (group_contract, escrow, date) = match &enrollment.competition_info {
         CompetitionInfo::Pending {
             escrow,
             group_contract,
+            date,
             ..
-        } => (group_contract, escrow),
+        } => (group_contract, escrow, date),
         CompetitionInfo::Existing { .. } => return Err(ContractError::AlreadyFinalized {}),
     };
 
@@ -287,7 +305,7 @@ pub fn finalize(
     // Check member requirements and expiration
     let min_min_members = get_min_min_members(&enrollment.competition_type);
     let min_members = enrollment.min_members.unwrap_or(min_min_members);
-    let is_expired = enrollment.expiration.is_expired(&env.block);
+    let is_expired = is_enrollment_expired(&env.block, date, enrollment.duration_before);
 
     // Create updated entry with finalized status
     let new_enrollment = EnrollmentEntry {
@@ -329,7 +347,6 @@ pub fn finalize(
         ContractError::FinalizeFailed {
             max_members: enrollment.max_members,
             current_members: members_count,
-            expiration: enrollment.expiration
         }
     );
 
@@ -338,13 +355,14 @@ pub fn finalize(
         CompetitionInfo::Pending {
             name,
             description,
-            expiration,
             rules,
             rulesets,
             banner,
             additional_layered_fees,
             escrow,
             group_contract,
+            date,
+            duration,
         } => {
             // Process additional fee information
             let additional_layered_fees = additional_layered_fees.as_ref().map(|fees| {
@@ -377,7 +395,8 @@ pub fn finalize(
                         escrow: escrow_info.clone(),
                         name: name.clone(),
                         description: description.clone(),
-                        expiration: *expiration,
+                        date: *date,
+                        duration: *duration,
                         rules: rules.clone(),
                         rulesets: rulesets.clone(),
                         banner: banner.clone(),
@@ -396,7 +415,8 @@ pub fn finalize(
                     escrow: escrow_info.clone(),
                     name: name.clone(),
                     description: description.clone(),
-                    expiration: *expiration,
+                    date: *date,
+                    duration: *duration,
                     rules: rules.clone(),
                     rulesets: rulesets.clone(),
                     banner: banner.clone(),
@@ -418,7 +438,8 @@ pub fn finalize(
                         escrow: escrow_info.clone(),
                         name: name.clone(),
                         description: description.clone(),
-                        expiration: *expiration,
+                        date: *date,
+                        duration: *duration,
                         rules: rules.clone(),
                         rulesets: rulesets.clone(),
                         banner: banner.clone(),
