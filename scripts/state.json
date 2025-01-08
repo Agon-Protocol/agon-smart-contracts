@@ -31,16 +31,16 @@
     },
     "pion-1": {
       "code_ids": {
-        "arena_competition_enrollment": 8728,
+        "arena_competition_enrollment": 8743,
         "arena_core": 8726,
         "arena_discord_identity": 8604,
         "arena_escrow": 8735,
         "arena_group": 8733,
-        "arena_league_module": 8731,
+        "arena_league_module": 8741,
         "arena_payment_registry": 8734,
         "arena_token_gateway": 8729,
-        "arena_tournament_module": 8732,
-        "arena_wager_module": 8730,
+        "arena_tournament_module": 8742,
+        "arena_wager_module": 8740,
         "cw_abc": 6824,
         "cw_payroll_factory": 6832,
         "dao_dao_core": 8679
