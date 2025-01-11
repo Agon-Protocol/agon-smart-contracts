@@ -56,7 +56,8 @@ pub fn execute(
             escrow,
             name,
             description,
-            expiration,
+            date,
+            duration,
             rules,
             rulesets,
             banner,
@@ -72,7 +73,8 @@ pub fn execute(
                 escrow,
                 name,
                 description,
-                expiration,
+                date,
+                duration,
                 rules,
                 rulesets,
                 banner,
@@ -168,7 +170,6 @@ pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response,
     let competition_module = CompetitionModule::default();
     let version = ensure_from_older_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
 
-    let mut msgs = vec![];
     match msg {
         MigrateMsg::Base(migrate_base) => match migrate_base {
             MigrateBase::FromCompatible {} => {
@@ -179,16 +180,12 @@ pub fn migrate(mut deps: DepsMut, env: Env, msg: MigrateMsg) -> Result<Response,
                     competition_module.migrate_from_v1_6_to_v1_7(deps.branch())?;
                 }
             }
-            MigrateBase::FromV2_2 { escrow_id } => {
-                msgs.extend(competition_module.migrate_from_v2_2_to_v2_3(
-                    deps.branch(),
-                    env,
-                    escrow_id,
-                )?);
+            MigrateBase::FromV2_3 {} => {
+                competition_module.migrate_from_v2_3_to_v2_3_1(deps.branch(), env)?;
             }
         },
     }
 
     set_contract_version(deps.storage, CONTRACT_NAME, CONTRACT_VERSION)?;
-    Ok(Response::default().add_messages(msgs))
+    Ok(Response::default())
 }

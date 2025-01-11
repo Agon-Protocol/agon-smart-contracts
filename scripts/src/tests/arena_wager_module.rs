@@ -16,7 +16,6 @@ use cw_balance::{
     BalanceUnchecked, BalanceVerified, Distribution, MemberBalanceUnchecked, MemberPercentage,
 };
 use cw_orch::{anyhow, prelude::*};
-use cw_utils::Expiration;
 use dao_interface::state::ModuleInstantiateInfo;
 use dao_interface::CoreQueryMsgFns;
 
@@ -36,7 +35,9 @@ fn test_create_wager() -> anyhow::Result<()> {
 
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "A test wager".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -63,7 +64,6 @@ fn test_create_wager() -> anyhow::Result<()> {
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -116,7 +116,9 @@ fn test_process_wager() -> anyhow::Result<()> {
 
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "A test wager".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -143,7 +145,6 @@ fn test_process_wager() -> anyhow::Result<()> {
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -243,7 +244,9 @@ fn test_escrow_receive_extra() -> anyhow::Result<()> {
 
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "A test wager".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -253,7 +256,6 @@ fn test_escrow_receive_extra() -> anyhow::Result<()> {
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -312,7 +314,9 @@ fn test_wager_with_additional_fees() -> anyhow::Result<()> {
 
     // Create a wager with additional fees
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "Wager with fees".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -344,7 +348,6 @@ fn test_wager_with_additional_fees() -> anyhow::Result<()> {
                 cw721_msg: None,
             }]),
         },
-        Expiration::AtHeight(mock.block_info()?.height + 100),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -465,7 +468,9 @@ fn test_wager_with_preset_distributions() -> anyhow::Result<()> {
     // Create a wager
     arena.arena_wager_module.set_sender(&admin);
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "Wager with preset distributions".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -492,7 +497,6 @@ fn test_wager_with_preset_distributions() -> anyhow::Result<()> {
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(mock.block_info()?.height + 100),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -611,7 +615,9 @@ fn test_wager_with_draw() -> anyhow::Result<()> {
     // Create a wager
     arena.arena_wager_module.set_sender(&admin);
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "Wager".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -638,7 +644,6 @@ fn test_wager_with_draw() -> anyhow::Result<()> {
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(mock.block_info()?.height + 100),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -736,7 +741,9 @@ fn test_wager_with_malicious_host() -> anyhow::Result<()> {
     // Create a wager
     arena.arena_wager_module.set_sender(&admin);
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "Wager".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -763,7 +770,6 @@ fn test_wager_with_malicious_host() -> anyhow::Result<()> {
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(mock.block_info()?.height + 100),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -862,7 +868,9 @@ fn test_wager_with_updated_distribution_after_activation() -> anyhow::Result<()>
     // Create a wager
     arena.arena_wager_module.set_sender(&admin);
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "Wager with updated distribution".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -889,7 +897,6 @@ fn test_wager_with_updated_distribution_after_activation() -> anyhow::Result<()>
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(mock.block_info()?.height + 100),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -1025,7 +1032,9 @@ fn test_jailed_wager_resolved_by_dao() -> anyhow::Result<()> {
 
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "A test wager".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -1052,7 +1061,6 @@ fn test_jailed_wager_resolved_by_dao() -> anyhow::Result<()> {
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(100000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -1191,7 +1199,9 @@ fn test_wager_with_stats() -> anyhow::Result<()> {
 
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "A test wager with stats".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -1218,7 +1228,6 @@ fn test_wager_with_stats() -> anyhow::Result<()> {
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,
@@ -1346,7 +1355,9 @@ fn test_wager_with_aggregate_stats() -> anyhow::Result<()> {
 
     // Create a wager
     let res = arena.arena_wager_module.create_competition(
+        mock.block_info()?.time.plus_seconds(86400),
         "A test wager with aggregate stats".to_string(),
+        86400,
         EscrowContractInfo::New {
             code_id: arena.arena_escrow.code_id()?,
             msg: to_json_binary(&arena_interface::escrow::InstantiateMsg {
@@ -1363,7 +1374,6 @@ fn test_wager_with_aggregate_stats() -> anyhow::Result<()> {
             label: "Wager Escrow".to_string(),
             additional_layered_fees: None,
         },
-        Expiration::AtHeight(1000000),
         GroupContractInfo::New {
             info: ModuleInstantiateInfo {
                 code_id: arena.arena_group.code_id()?,

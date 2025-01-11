@@ -12,7 +12,7 @@ use arena_tournament_module::{
     },
     state::{EliminationType, MatchResult},
 };
-use cosmwasm_std::{coins, to_json_binary, Decimal, Uint128};
+use cosmwasm_std::{coins, to_json_binary, Decimal, Timestamp, Uint128};
 use cw_balance::{BalanceUnchecked, MemberBalanceUnchecked};
 use cw_orch::{environment::ChainState, prelude::*};
 use dao_interface::state::ModuleInstantiateInfo;
@@ -50,6 +50,7 @@ pub fn test_tournament_instantiate() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(15u128, 100u128),
                 Decimal::from_ratio(10u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     );
@@ -71,6 +72,7 @@ pub fn test_tournament_instantiate() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(5u128, 100u128),
                 Decimal::from_ratio(5u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     );
@@ -89,6 +91,7 @@ pub fn test_tournament_instantiate() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(100u128, 100u128),
                 Decimal::from_ratio(100u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     );
@@ -107,6 +110,7 @@ pub fn test_tournament_instantiate() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(10u128, 100u128),
                 Decimal::from_ratio(5u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     );
@@ -141,6 +145,7 @@ pub fn test_single_elimination_tournament() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(75u128, 100u128),
                 Decimal::from_ratio(25u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     )?;
@@ -308,6 +313,7 @@ pub fn test_ratings() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(75u128, 100u128),
                 Decimal::from_ratio(25u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     )?;
@@ -462,6 +468,7 @@ pub fn test_single_elimination_tournament_with_third_place_match() -> Result<(),
                 Decimal::from_ratio(10u128, 100u128),
                 Decimal::from_ratio(10u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     )?;
@@ -613,6 +620,7 @@ pub fn test_double_elimination_tournament_with_rebuttal() -> Result<(), CwOrchEr
                 Decimal::from_ratio(25u128, 100u128),
                 Decimal::from_ratio(10u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     )?;
@@ -842,6 +850,7 @@ pub fn test_double_elimination_tournament() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(25u128, 100u128),
                 Decimal::from_ratio(10u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     )?;
@@ -1065,6 +1074,7 @@ pub fn test_single_elimination_6() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(25u128, 100u128),
                 Decimal::from_ratio(10u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     )?;
@@ -1208,6 +1218,7 @@ pub fn test_double_elimination_many_teams() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(25u128, 100u128),
                 Decimal::from_ratio(10u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     )?;
@@ -1240,6 +1251,7 @@ pub fn test_match_updates() -> Result<(), CwOrchError> {
                 Decimal::from_ratio(25u128, 100u128),
                 Decimal::from_ratio(10u128, 100u128),
             ],
+            mock.block_info()?.time.plus_seconds(86400),
         )?,
         None,
     )?;
@@ -1373,13 +1385,15 @@ fn create_competition_msg<Chain: ChainState>(
     teams: &[Addr],
     elimination_type: EliminationType,
     distribution: Vec<Decimal>,
+    date: Timestamp,
 ) -> Result<ExecuteMsg, CwOrchError> {
     Ok(ExecuteMsg::CreateCompetition {
         category_id,
         host: None,
         name: "Competition".to_string(),
         description: "Competition description".to_string(),
-        expiration: cw_utils::Expiration::Never {},
+        date,
+        duration: 86400,
         rules: None,
         rulesets: None,
         banner: None,

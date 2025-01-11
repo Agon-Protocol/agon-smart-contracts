@@ -1,6 +1,6 @@
 use crate::fees::FeeInformation;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, BlockInfo, Timestamp, Uint128};
+use cosmwasm_std::{Addr, Timestamp, Uint128};
 use cw_utils::Expiration;
 use std::fmt;
 
@@ -43,7 +43,8 @@ pub struct Competition<CompetitionExt> {
     pub name: String,
     pub description: String,
     pub start_height: u64,
-    pub expiration: Expiration,
+    pub date: Timestamp,
+    pub duration: u64,
     pub rulesets: Option<Vec<Uint128>>,
     pub status: CompetitionStatus,
     pub extension: CompetitionExt,
@@ -55,12 +56,12 @@ pub struct Competition<CompetitionExt> {
 }
 
 #[cw_serde]
-pub struct CompetitionV2_2<CompetitionExt> {
+pub struct CompetitionV2_3<CompetitionExt> {
     pub id: Uint128,
     pub category_id: Option<Uint128>,
     pub admin_dao: Addr,
     pub host: Addr,
-    pub escrow: Option<Addr>,
+    pub escrow: Addr,
     pub name: String,
     pub description: String,
     pub start_height: u64,
@@ -85,7 +86,8 @@ pub struct TempCompetition<CompetitionInstantiateExt> {
     pub name: String,
     pub description: String,
     pub start_height: u64,
-    pub expiration: Expiration,
+    pub date: Timestamp,
+    pub duration: u64,
     pub rulesets: Option<Vec<Uint128>>,
     pub status: CompetitionStatus,
     /// Additional layered fees
@@ -105,25 +107,19 @@ pub struct CompetitionResponse<CompetitionExt> {
     pub name: String,
     pub description: String,
     pub start_height: u64,
-    pub is_expired: bool,
     pub rules: Option<Vec<String>>,
     pub rulesets: Option<Vec<Uint128>>,
     pub status: CompetitionStatus,
     pub extension: CompetitionExt,
-    pub expiration: Expiration,
+    pub date: Timestamp,
+    pub duration: u64,
     pub fees: Option<Vec<FeeInformation<Addr>>>,
     pub banner: Option<String>,
     pub group_contract: Addr,
 }
 
 impl<CompetitionExt> Competition<CompetitionExt> {
-    pub fn into_response(
-        self,
-        rules: Option<Vec<String>>,
-        block: &BlockInfo,
-    ) -> CompetitionResponse<CompetitionExt> {
-        let is_expired = self.expiration.is_expired(block);
-
+    pub fn into_response(self, rules: Option<Vec<String>>) -> CompetitionResponse<CompetitionExt> {
         CompetitionResponse {
             id: self.id,
             category_id: self.category_id,
@@ -132,12 +128,12 @@ impl<CompetitionExt> Competition<CompetitionExt> {
             name: self.name,
             description: self.description,
             start_height: self.start_height,
-            is_expired,
             rules,
             rulesets: self.rulesets,
             status: self.status,
             extension: self.extension,
-            expiration: self.expiration,
+            date: self.date,
+            duration: self.duration,
             fees: self.fees,
             banner: self.banner,
             group_contract: self.group_contract,

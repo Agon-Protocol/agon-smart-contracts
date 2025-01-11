@@ -3,7 +3,7 @@ use std::fmt;
 use arena_interface::{competition::state::CompetitionResponse, fees::FeeInformation, group};
 use arena_tournament_module::state::EliminationType;
 use cosmwasm_schema::cw_serde;
-use cosmwasm_std::{Addr, BlockInfo, Coin, Decimal, Deps, Empty, StdResult, Uint128, Uint64};
+use cosmwasm_std::{Addr, Coin, Decimal, Deps, Empty, StdResult, Timestamp, Uint128, Uint64};
 use cw_storage_plus::{Index, IndexList, IndexedMap, Item, Map, MultiIndex};
 use cw_utils::Expiration;
 
@@ -13,13 +13,12 @@ pub struct LegacyEnrollmentEntry {
     pub max_members: Uint64,
     pub entry_fee: Option<Coin>,
     pub expiration: Expiration,
-    pub has_triggered_expiration: bool,
+    pub has_finalized: bool,
     pub competition_info: LegacyCompetitionInfo,
     pub competition_type: CompetitionType,
     pub host: Addr,
     pub category_id: Option<Uint128>,
     pub competition_module: Addr,
-    pub group_contract: Addr,
     pub required_team_size: Option<u32>,
 }
 
@@ -28,7 +27,7 @@ pub struct EnrollmentEntry {
     pub min_members: Option<Uint64>,
     pub max_members: Uint64,
     pub entry_fee: Option<Coin>,
-    pub expiration: Expiration,
+    pub duration_before: u64,
     pub has_finalized: bool,
     pub competition_info: CompetitionInfo,
     pub competition_type: CompetitionType,
@@ -46,21 +45,21 @@ pub struct EnrollmentEntryResponse {
     pub min_members: Option<Uint64>,
     pub max_members: Uint64,
     pub entry_fee: Option<Coin>,
-    pub expiration: Expiration,
+    pub duration_before: u64,
     pub has_finalized: bool,
     pub competition_info: CompetitionInfoResponse,
     pub competition_type: CompetitionType,
     pub host: Addr,
-    pub is_expired: bool,
     pub competition_module: Addr,
-    pub require_team_size: Option<u32>,
+    pub required_team_size: Option<u32>,
 }
 
 #[cw_serde]
 pub struct CompetitionInfoResponse {
     pub name: String,
     pub description: String,
-    pub expiration: Expiration,
+    pub date: Timestamp,
+    pub duration: u64,
     pub rules: Option<Vec<String>>,
     pub rulesets: Option<Vec<Uint128>>,
     pub banner: Option<String>,
@@ -71,12 +70,7 @@ pub struct CompetitionInfoResponse {
 }
 
 impl EnrollmentEntry {
-    pub fn into_response(
-        self,
-        deps: Deps,
-        block: &BlockInfo,
-        id: Uint128,
-    ) -> StdResult<EnrollmentEntryResponse> {
+    pub fn into_response(self, deps: Deps, id: Uint128) -> StdResult<EnrollmentEntryResponse> {
         let competition_info = self
             .competition_info
             .into_response(deps, &self.competition_module)?;
@@ -84,7 +78,6 @@ impl EnrollmentEntry {
             competition_info.group_contract.to_string(),
             &group::QueryMsg::MembersCount {},
         )?;
-        let is_expired = self.expiration.is_expired(block);
 
         Ok(EnrollmentEntryResponse {
             category_id: self.category_id,
@@ -93,14 +86,13 @@ impl EnrollmentEntry {
             min_members: self.min_members,
             max_members: self.max_members,
             entry_fee: self.entry_fee,
-            expiration: self.expiration,
+            duration_before: self.duration_before,
             has_finalized: self.has_finalized,
             competition_info,
             competition_type: self.competition_type,
             host: self.host,
-            is_expired,
             competition_module: self.competition_module,
-            require_team_size: self.required_team_size,
+            required_team_size: self.required_team_size,
         })
     }
 }
@@ -141,6 +133,8 @@ pub enum LegacyCompetitionInfo {
         rulesets: Option<Vec<Uint128>>,
         banner: Option<String>,
         additional_layered_fees: Option<Vec<FeeInformation<Addr>>>,
+        escrow: Addr,
+        group_contract: Addr,
     },
     Existing {
         id: Uint128,
@@ -152,7 +146,8 @@ pub enum CompetitionInfo {
     Pending {
         name: String,
         description: String,
-        expiration: Expiration,
+        date: Timestamp,
+        duration: u64,
         rules: Option<Vec<String>>,
         rulesets: Option<Vec<Uint128>>,
         banner: Option<String>,
@@ -175,7 +170,8 @@ impl CompetitionInfo {
             CompetitionInfo::Pending {
                 name,
                 description,
-                expiration,
+                date,
+                duration,
                 rules,
                 rulesets,
                 banner,
@@ -185,7 +181,8 @@ impl CompetitionInfo {
             } => CompetitionInfoResponse {
                 name,
                 description,
-                expiration,
+                date,
+                duration,
                 rules,
                 rulesets,
                 banner,
@@ -214,7 +211,8 @@ impl CompetitionInfo {
                     rules: competition.rules,
                     rulesets: competition.rulesets,
                     banner: competition.banner,
-                    expiration: competition.expiration,
+                    duration: competition.duration,
+                    date: competition.date,
                     additional_layered_fees: competition.fees,
                     competition_id: Some(id),
                     escrow: competition.escrow,

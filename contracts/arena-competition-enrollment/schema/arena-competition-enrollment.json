@@ -1,6 +1,6 @@
 {
   "contract_name": "arena-competition-enrollment",
-  "contract_version": "2.3.0",
+  "contract_version": "2.3.1",
   "idl_version": "1.0.0",
   "instantiate": {
     "$schema": "http://json-schema.org/draft-07/schema#",
@@ -31,8 +31,8 @@
             "required": [
               "competition_info",
               "competition_type",
+              "duration_before",
               "escrow_contract_info",
-              "expiration",
               "group_contract_info",
               "max_members"
             ],
@@ -53,6 +53,12 @@
               "competition_type": {
                 "$ref": "#/definitions/CompetitionType"
               },
+              "duration_before": {
+                "description": "Seconds before the competition date until registration is expired",
+                "type": "integer",
+                "format": "uint64",
+                "minimum": 0.0
+              },
               "entry_fee": {
                 "description": "The entry fee of the competition",
                 "anyOf": [
@@ -66,9 +72,6 @@
               },
               "escrow_contract_info": {
                 "$ref": "#/definitions/EscrowContractInfo"
-              },
-              "expiration": {
-                "$ref": "#/definitions/Expiration"
               },
               "group_contract_info": {
                 "$ref": "#/definitions/ModuleInstantiateInfo"
@@ -164,6 +167,13 @@
             "properties": {
               "id": {
                 "$ref": "#/definitions/Uint128"
+              },
+              "team": {
+                "description": "Optional team to withdraw Only callable by a member",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "additionalProperties": false
@@ -356,8 +366,9 @@
       "CompetitionInfoMsg": {
         "type": "object",
         "required": [
+          "date",
           "description",
-          "expiration",
+          "duration",
           "name"
         ],
         "properties": {
@@ -367,11 +378,16 @@
               "null"
             ]
           },
+          "date": {
+            "$ref": "#/definitions/Timestamp"
+          },
           "description": {
             "type": "string"
           },
-          "expiration": {
-            "$ref": "#/definitions/Expiration"
+          "duration": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
           },
           "name": {
             "type": "string"
@@ -971,21 +987,11 @@
       {
         "type": "object",
         "required": [
-          "from_v2_2"
+          "from_v2_3"
         ],
         "properties": {
-          "from_v2_2": {
+          "from_v2_3": {
             "type": "object",
-            "required": [
-              "escrow_id"
-            ],
-            "properties": {
-              "escrow_id": {
-                "type": "integer",
-                "format": "uint64",
-                "minimum": 0.0
-              }
-            },
             "additionalProperties": false
           }
         },
@@ -1039,9 +1045,10 @@
       "CompetitionInfoResponse": {
         "type": "object",
         "required": [
+          "date",
           "description",
+          "duration",
           "escrow",
-          "expiration",
           "group_contract",
           "name"
         ],
@@ -1071,14 +1078,19 @@
               }
             ]
           },
+          "date": {
+            "$ref": "#/definitions/Timestamp"
+          },
           "description": {
             "type": "string"
           },
+          "duration": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
           "escrow": {
             "$ref": "#/definitions/Addr"
-          },
-          "expiration": {
-            "$ref": "#/definitions/Expiration"
           },
           "group_contract": {
             "$ref": "#/definitions/Addr"
@@ -1230,11 +1242,10 @@
           "competition_module",
           "competition_type",
           "current_members",
-          "expiration",
+          "duration_before",
           "has_finalized",
           "host",
           "id",
-          "is_expired",
           "max_members"
         ],
         "properties": {
@@ -1260,6 +1271,11 @@
           "current_members": {
             "$ref": "#/definitions/Uint64"
           },
+          "duration_before": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0.0
+          },
           "entry_fee": {
             "anyOf": [
               {
@@ -1270,9 +1286,6 @@
               }
             ]
           },
-          "expiration": {
-            "$ref": "#/definitions/Expiration"
-          },
           "has_finalized": {
             "type": "boolean"
           },
@@ -1281,9 +1294,6 @@
           },
           "id": {
             "$ref": "#/definitions/Uint128"
-          },
-          "is_expired": {
-            "type": "boolean"
           },
           "max_members": {
             "$ref": "#/definitions/Uint64"
@@ -1298,7 +1308,7 @@
               }
             ]
           },
-          "require_team_size": {
+          "required_team_size": {
             "type": [
               "integer",
               "null"
@@ -1308,53 +1318,6 @@
           }
         },
         "additionalProperties": false
-      },
-      "Expiration": {
-        "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
-        "oneOf": [
-          {
-            "description": "AtHeight will expire when `env.block.height` >= height",
-            "type": "object",
-            "required": [
-              "at_height"
-            ],
-            "properties": {
-              "at_height": {
-                "type": "integer",
-                "format": "uint64",
-                "minimum": 0.0
-              }
-            },
-            "additionalProperties": false
-          },
-          {
-            "description": "AtTime will expire when `env.block.time` >= time",
-            "type": "object",
-            "required": [
-              "at_time"
-            ],
-            "properties": {
-              "at_time": {
-                "$ref": "#/definitions/Timestamp"
-              }
-            },
-            "additionalProperties": false
-          },
-          {
-            "description": "Never will never expire. Used to express the empty variant",
-            "type": "object",
-            "required": [
-              "never"
-            ],
-            "properties": {
-              "never": {
-                "type": "object",
-                "additionalProperties": false
-              }
-            },
-            "additionalProperties": false
-          }
-        ]
       },
       "FeeInformation_for_Addr": {
         "type": "object",
@@ -1420,11 +1383,10 @@
         "competition_module",
         "competition_type",
         "current_members",
-        "expiration",
+        "duration_before",
         "has_finalized",
         "host",
         "id",
-        "is_expired",
         "max_members"
       ],
       "properties": {
@@ -1450,6 +1412,11 @@
         "current_members": {
           "$ref": "#/definitions/Uint64"
         },
+        "duration_before": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0.0
+        },
         "entry_fee": {
           "anyOf": [
             {
@@ -1460,9 +1427,6 @@
             }
           ]
         },
-        "expiration": {
-          "$ref": "#/definitions/Expiration"
-        },
         "has_finalized": {
           "type": "boolean"
         },
@@ -1471,9 +1435,6 @@
         },
         "id": {
           "$ref": "#/definitions/Uint128"
-        },
-        "is_expired": {
-          "type": "boolean"
         },
         "max_members": {
           "$ref": "#/definitions/Uint64"
@@ -1488,7 +1449,7 @@
             }
           ]
         },
-        "require_team_size": {
+        "required_team_size": {
           "type": [
             "integer",
             "null"
@@ -1525,9 +1486,10 @@
         "CompetitionInfoResponse": {
           "type": "object",
           "required": [
+            "date",
             "description",
+            "duration",
             "escrow",
-            "expiration",
             "group_contract",
             "name"
           ],
@@ -1557,14 +1519,19 @@
                 }
               ]
             },
+            "date": {
+              "$ref": "#/definitions/Timestamp"
+            },
             "description": {
               "type": "string"
             },
+            "duration": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
             "escrow": {
               "$ref": "#/definitions/Addr"
-            },
-            "expiration": {
-              "$ref": "#/definitions/Expiration"
             },
             "group_contract": {
               "$ref": "#/definitions/Addr"
@@ -1709,53 +1676,6 @@
             }
           ]
         },
-        "Expiration": {
-          "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
-          "oneOf": [
-            {
-              "description": "AtHeight will expire when `env.block.height` >= height",
-              "type": "object",
-              "required": [
-                "at_height"
-              ],
-              "properties": {
-                "at_height": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "AtTime will expire when `env.block.time` >= time",
-              "type": "object",
-              "required": [
-                "at_time"
-              ],
-              "properties": {
-                "at_time": {
-                  "$ref": "#/definitions/Timestamp"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "Never will never expire. Used to express the empty variant",
-              "type": "object",
-              "required": [
-                "never"
-              ],
-              "properties": {
-                "never": {
-                  "type": "object",
-                  "additionalProperties": false
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
-        },
         "FeeInformation_for_Addr": {
           "type": "object",
           "required": [
@@ -1850,9 +1770,10 @@
         "CompetitionInfoResponse": {
           "type": "object",
           "required": [
+            "date",
             "description",
+            "duration",
             "escrow",
-            "expiration",
             "group_contract",
             "name"
           ],
@@ -1882,14 +1803,19 @@
                 }
               ]
             },
+            "date": {
+              "$ref": "#/definitions/Timestamp"
+            },
             "description": {
               "type": "string"
             },
+            "duration": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
             "escrow": {
               "$ref": "#/definitions/Addr"
-            },
-            "expiration": {
-              "$ref": "#/definitions/Expiration"
             },
             "group_contract": {
               "$ref": "#/definitions/Addr"
@@ -2041,11 +1967,10 @@
             "competition_module",
             "competition_type",
             "current_members",
-            "expiration",
+            "duration_before",
             "has_finalized",
             "host",
             "id",
-            "is_expired",
             "max_members"
           ],
           "properties": {
@@ -2071,6 +1996,11 @@
             "current_members": {
               "$ref": "#/definitions/Uint64"
             },
+            "duration_before": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0.0
+            },
             "entry_fee": {
               "anyOf": [
                 {
@@ -2081,9 +2011,6 @@
                 }
               ]
             },
-            "expiration": {
-              "$ref": "#/definitions/Expiration"
-            },
             "has_finalized": {
               "type": "boolean"
             },
@@ -2092,9 +2019,6 @@
             },
             "id": {
               "$ref": "#/definitions/Uint128"
-            },
-            "is_expired": {
-              "type": "boolean"
             },
             "max_members": {
               "$ref": "#/definitions/Uint64"
@@ -2109,7 +2033,7 @@
                 }
               ]
             },
-            "require_team_size": {
+            "required_team_size": {
               "type": [
                 "integer",
                 "null"
@@ -2119,53 +2043,6 @@
             }
           },
           "additionalProperties": false
-        },
-        "Expiration": {
-          "description": "Expiration represents a point in time when some event happens. It can compare with a BlockInfo and will return is_expired() == true once the condition is hit (and for every block in the future)",
-          "oneOf": [
-            {
-              "description": "AtHeight will expire when `env.block.height` >= height",
-              "type": "object",
-              "required": [
-                "at_height"
-              ],
-              "properties": {
-                "at_height": {
-                  "type": "integer",
-                  "format": "uint64",
-                  "minimum": 0.0
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "AtTime will expire when `env.block.time` >= time",
-              "type": "object",
-              "required": [
-                "at_time"
-              ],
-              "properties": {
-                "at_time": {
-                  "$ref": "#/definitions/Timestamp"
-                }
-              },
-              "additionalProperties": false
-            },
-            {
-              "description": "Never will never expire. Used to express the empty variant",
-              "type": "object",
-              "required": [
-                "never"
-              ],
-              "properties": {
-                "never": {
-                  "type": "object",
-                  "additionalProperties": false
-                }
-              },
-              "additionalProperties": false
-            }
-          ]
         },
         "FeeInformation_for_Addr": {
           "type": "object",

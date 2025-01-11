@@ -10,7 +10,7 @@ use arena_interface::{
             ToCompetitionExt,
         },
         state::{
-            Competition, CompetitionResponse, CompetitionStatus, CompetitionV2_2, Config, Evidence,
+            Competition, CompetitionResponse, CompetitionStatus, CompetitionV2_3, Config, Evidence,
             TempCompetition,
         },
         stats::{
@@ -19,16 +19,16 @@ use arena_interface::{
         },
     },
     core::{ProposeMessage, TaxConfigurationResponse},
-    escrow,
     fees::FeeInformation,
     group::{self, GroupContractInfo},
+    helpers::is_expired,
     ratings::MemberResult,
 };
 use cosmwasm_schema::schemars::JsonSchema;
 use cosmwasm_std::{
     ensure, ensure_eq, instantiate2_address, to_json_binary, Addr, Binary, CosmosMsg, Decimal,
     Deps, DepsMut, Empty, Env, MessageInfo, Order, Reply, Response, StdError, StdResult, Storage,
-    SubMsg, Uint128, WasmMsg,
+    SubMsg, Timestamp, Uint128, WasmMsg,
 };
 use cw_balance::Distribution;
 use cw_ownable::{get_ownership, initialize_owner};
@@ -80,7 +80,7 @@ pub struct CompetitionModuleContract<
         Competition<CompetitionExt>,
         CompetitionIndexes<'static, CompetitionExt>,
     >,
-    pub competitions_v2_2: Map<'static, u128, CompetitionV2_2<CompetitionExt>>,
+    pub competitions_v2_3: Map<'static, u128, CompetitionV2_3<CompetitionExt>>,
     pub competition_evidence: Map<'static, (u128, u128), Evidence>,
     pub competition_evidence_count: Map<'static, u128, Uint128>,
     pub competition_result: Map<'static, u128, Option<Distribution<Addr>>>,
@@ -142,7 +142,7 @@ impl<
                 competitions_category_key,
                 competitions_host_key,
             ),
-            competitions_v2_2: Map::new(competitions_key),
+            competitions_v2_3: Map::new(competitions_key),
             escrows_to_competitions: Map::new(escrows_to_competitions_key),
             temp_competition: Item::new(temp_competition_key),
             temp_competition_id: Item::new(temp_competition_id_key),
@@ -306,7 +306,8 @@ impl<
                 escrow,
                 name,
                 description,
-                expiration,
+                date,
+                duration,
                 rules,
                 rulesets,
                 banner,
@@ -321,7 +322,8 @@ impl<
                 escrow,
                 name,
                 description,
-                expiration,
+                date,
+                duration,
                 rules,
                 rulesets,
                 banner,
@@ -546,7 +548,7 @@ impl<
                 // Validate competition status
                 let activation_height = match competition.status {
                     CompetitionStatus::Active { activation_height } => {
-                        if !competition.expiration.is_expired(&env.block) {
+                        if !is_expired(&env.block, &competition.date, competition.duration) {
                             return Err(CompetitionError::CompetitionNotExpired {});
                         }
 
@@ -595,20 +597,14 @@ impl<
         escrow: EscrowContractInfo,
         name: String,
         description: String,
-        expiration: cw_utils::Expiration,
+        date: Timestamp,
+        duration: u64,
         rules: Option<Vec<String>>,
         rulesets: Option<Vec<Uint128>>,
         banner: Option<String>,
         group_contract: GroupContractInfo,
         extension: CompetitionInstantiateExt,
     ) -> Result<Response, CompetitionError> {
-        // Validate expiration
-        if expiration.is_expired(&env.block) {
-            return Err(CompetitionError::StdError(StdError::generic_err(
-                "Cannot create an expired competition",
-            )));
-        }
-
         // Ensure Module has an owner
         let ownership = get_ownership(deps.storage)?;
         let arena_core = ownership.owner.ok_or(CompetitionError::OwnershipError(
@@ -764,7 +760,8 @@ impl<
                     escrow: escrow_addr,
                     name,
                     description,
-                    expiration,
+                    date,
+                    duration,
                     rulesets,
                     status,
                     extension: extension.to_competition_ext(deps.as_ref(), &group_contract)?,
@@ -790,7 +787,8 @@ impl<
                         name,
                         description,
                         start_height: env.block.height,
-                        expiration,
+                        date,
+                        duration,
                         rulesets,
                         status,
                         fees,
@@ -1461,7 +1459,7 @@ impl<
     pub fn query_competition(
         &self,
         deps: Deps,
-        env: Env,
+        _env: Env,
         competition_id: Uint128,
     ) -> StdResult<CompetitionResponse<CompetitionExt>> {
         let rules = self
@@ -1471,7 +1469,7 @@ impl<
         Ok(self
             .competitions
             .load(deps.storage, competition_id.u128())?
-            .into_response(rules, &env.block))
+            .into_response(rules))
     }
 
     pub fn query_arena_tax_config(
@@ -1509,7 +1507,7 @@ impl<
     fn query_competitions(
         &self,
         deps: Deps,
-        env: Env,
+        _env: Env,
         start_after: Option<Uint128>,
         limit: Option<u32>,
         filter: Option<CompetitionsFilter>,
@@ -1523,10 +1521,7 @@ impl<
                 deps.storage,
                 start_after_bound,
                 Some(limit),
-                |x, y| {
-                    let rules = self.competition_rules.may_load(deps.storage, x)?;
-                    Ok(y.into_response(rules, &env.block))
-                },
+                |_x, y| Ok(y.into_response(None)),
             ),
             Some(filter) => match filter {
                 CompetitionsFilter::CompetitionStatus { status } => self
@@ -1540,12 +1535,7 @@ impl<
                         None,
                         cosmwasm_std::Order::Descending,
                     )
-                    .flat_map(|x| {
-                        x.map(|y| {
-                            let rules = self.competition_rules.may_load(deps.storage, y.0)?;
-                            Ok(y.1.into_response(rules, &env.block))
-                        })
-                    })
+                    .flat_map(|x| x.map(|y| Ok(y.1.into_response(None))))
                     .take(limit as usize)
                     .collect::<StdResult<Vec<_>>>(),
                 CompetitionsFilter::Category { id } => self
@@ -1559,12 +1549,7 @@ impl<
                         None,
                         cosmwasm_std::Order::Descending,
                     )
-                    .flat_map(|x| {
-                        x.map(|y| {
-                            let rules = self.competition_rules.may_load(deps.storage, y.0)?;
-                            Ok(y.1.into_response(rules, &env.block))
-                        })
-                    })
+                    .flat_map(|x| x.map(|y| Ok(y.1.into_response(None))))
                     .take(limit as usize)
                     .collect::<StdResult<Vec<_>>>(),
                 CompetitionsFilter::Host(addr) => self
@@ -1578,12 +1563,7 @@ impl<
                         None,
                         cosmwasm_std::Order::Descending,
                     )
-                    .flat_map(|x| {
-                        x.map(|y| {
-                            let rules = self.competition_rules.may_load(deps.storage, y.0)?;
-                            Ok(y.1.into_response(rules, &env.block))
-                        })
-                    })
+                    .flat_map(|x| x.map(|y| Ok(y.1.into_response(None))))
                     .take(limit as usize)
                     .collect::<StdResult<Vec<_>>>(),
             },
@@ -1661,57 +1641,33 @@ impl<
         Ok(())
     }
 
-    pub fn migrate_from_v2_2_to_v2_3(
+    pub fn migrate_from_v2_3_to_v2_3_1(
         &self,
         deps: DepsMut,
         env: Env,
-        escrow_id: u64,
-    ) -> Result<Vec<CosmosMsg>, CompetitionError> {
-        let mut msgs = vec![];
-        let code_info = deps.querier.query_wasm_code_info(escrow_id)?;
-
+    ) -> Result<(), CompetitionError> {
         for (competition_id, competition) in self
-            .competitions_v2_2
+            .competitions_v2_3
             .range(deps.storage, None, None, cosmwasm_std::Order::Descending)
             .collect::<StdResult<Vec<_>>>()?
         {
-            let escrow = match competition.escrow {
-                Some(escrow) => escrow,
-                None => {
-                    let binding =
-                        format!("{}{}{}", "competition", env.block.height, competition_id);
-                    let salt: [u8; 32] = Sha256::digest(binding.as_bytes()).into();
-                    let canonical_creator =
-                        deps.api.addr_canonicalize(env.contract.address.as_str())?;
-                    let canonical_addr =
-                        instantiate2_address(&code_info.checksum, &canonical_creator, &salt)?;
-
-                    msgs.push(CosmosMsg::Wasm(WasmMsg::Instantiate2 {
-                        admin: Some(env.contract.address.to_string()),
-                        code_id: escrow_id,
-                        label: "Arena Escrow".to_string(),
-                        msg: to_json_binary(&escrow::InstantiateMsg {
-                            dues: vec![],
-                            is_enrollment: false,
-                        })?,
-                        funds: vec![],
-                        salt: salt.into(),
-                    }));
-
-                    deps.api.addr_humanize(&canonical_addr)?
-                }
+            let date = match competition.expiration {
+                cw_utils::Expiration::AtTime(timestamp) => timestamp,
+                _ => env.block.time,
             };
+            let duration = 3600u64;
 
             let new_competition = Competition {
                 id: competition.id,
                 category_id: competition.category_id,
                 admin_dao: competition.admin_dao,
                 host: competition.host,
-                escrow,
+                escrow: competition.escrow,
                 name: competition.name,
                 description: competition.description,
                 start_height: competition.start_height,
-                expiration: competition.expiration,
+                date,
+                duration,
                 rulesets: competition.rulesets,
                 status: competition.status,
                 extension: competition.extension,
@@ -1728,7 +1684,7 @@ impl<
             )?;
         }
 
-        Ok(msgs)
+        Ok(())
     }
 
     fn reply_group_instantiate_reply(
@@ -1756,7 +1712,8 @@ impl<
                 name: temp_competition.name,
                 description: temp_competition.description,
                 start_height: temp_competition.start_height,
-                expiration: temp_competition.expiration,
+                date: temp_competition.date,
+                duration: temp_competition.duration,
                 rulesets: temp_competition.rulesets,
                 status: temp_competition.status,
                 extension,
