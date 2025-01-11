@@ -82,7 +82,7 @@ pub fn execute(
         }
         ExecuteMsg::Finalize { id } => execute::finalize(deps, env, info, id),
         ExecuteMsg::Enroll { id, team } => execute::enroll(deps, env, info, id, team),
-        ExecuteMsg::Withdraw { id } => execute::withdraw(deps, env, info, id),
+        ExecuteMsg::Withdraw { id, team } => execute::withdraw(deps, env, info, id, team),
         ExecuteMsg::ForceWithdraw { id, members } => {
             execute::force_withdraw(deps, env, info, id, members)
         }

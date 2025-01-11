@@ -148,7 +148,7 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
     // Withdraw a member before expiration
     let res = arena
         .arena_competition_enrollment
-        .withdraw(Uint128::one())?;
+        .withdraw(Uint128::one(), None)?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -175,7 +175,7 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
     arena.arena_competition_enrollment.set_sender(&teams[0]);
     arena
         .arena_competition_enrollment
-        .withdraw(Uint128::one())?;
+        .withdraw(Uint128::one(), None)?;
 
     Ok(())
 }
@@ -729,7 +729,7 @@ fn test_finalize_before_min_members() -> anyhow::Result<()> {
         arena.arena_competition_enrollment.set_sender(team);
         let withdraw_res = arena
             .arena_competition_enrollment
-            .withdraw(Uint128::one())?;
+            .withdraw(Uint128::one(), None)?;
 
         // Check that the withdrawal was successful
         assert!(withdraw_res.events.iter().any(|e| e.ty == "wasm"
@@ -824,7 +824,7 @@ fn test_unregistered_competition_enrollment() -> anyhow::Result<()> {
         arena.arena_competition_enrollment.set_sender(&team);
         let withdraw_res = arena
             .arena_competition_enrollment
-            .withdraw(Uint128::one())?;
+            .withdraw(Uint128::one(), None)?;
 
         // Check that the withdrawal was successful
         assert!(withdraw_res.events.iter().any(|e| e.ty == "wasm"

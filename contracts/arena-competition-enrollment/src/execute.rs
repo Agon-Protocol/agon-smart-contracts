@@ -609,12 +609,32 @@ pub fn withdraw(
     _env: Env,
     info: MessageInfo,
     id: Uint128,
+    team: Option<String>,
 ) -> Result<Response, ContractError> {
     // Load the enrollment entry
     let enrollment = enrollment_entries().load(deps.storage, id.u128())?;
 
-    Ok(_withdraw(enrollment, vec![info.sender.to_string()], id)?
-        .add_attribute("action", "withdraw"))
+    // Set correct member
+    let member = if let Some(team) = team {
+        let team = deps.api.addr_validate(&team)?;
+        let voting_power_response: VotingPowerAtHeightResponse = deps.querier.query_wasm_smart(
+            team.to_string(),
+            &dao_interface::msg::QueryMsg::VotingPowerAtHeight {
+                address: info.sender.to_string(),
+                height: None,
+            },
+        )?;
+
+        if voting_power_response.power.is_zero() {
+            return Err(ContractError::NotTeamMember {});
+        }
+
+        team
+    } else {
+        info.sender
+    };
+
+    Ok(_withdraw(enrollment, vec![member.to_string()], id)?.add_attribute("action", "withdraw"))
 }
 
 pub fn force_withdraw(

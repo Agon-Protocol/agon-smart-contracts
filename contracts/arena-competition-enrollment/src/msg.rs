@@ -43,6 +43,9 @@ pub enum ExecuteMsg {
     },
     Withdraw {
         id: Uint128,
+        /// Optional team to withdraw
+        /// Only callable by a member
+        team: Option<String>,
     },
     ForceWithdraw {
         id: Uint128,

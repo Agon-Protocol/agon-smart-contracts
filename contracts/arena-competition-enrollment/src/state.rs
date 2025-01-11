@@ -51,7 +51,7 @@ pub struct EnrollmentEntryResponse {
     pub competition_type: CompetitionType,
     pub host: Addr,
     pub competition_module: Addr,
-    pub require_team_size: Option<u32>,
+    pub required_team_size: Option<u32>,
 }
 
 #[cw_serde]
@@ -92,7 +92,7 @@ impl EnrollmentEntry {
             competition_type: self.competition_type,
             host: self.host,
             competition_module: self.competition_module,
-            require_team_size: self.required_team_size,
+            required_team_size: self.required_team_size,
         })
     }
 }

@@ -167,6 +167,13 @@
             "properties": {
               "id": {
                 "$ref": "#/definitions/Uint128"
+              },
+              "team": {
+                "description": "Optional team to withdraw Only callable by a member",
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "additionalProperties": false
@@ -1301,7 +1308,7 @@
               }
             ]
           },
-          "require_team_size": {
+          "required_team_size": {
             "type": [
               "integer",
               "null"
@@ -1442,7 +1449,7 @@
             }
           ]
         },
-        "require_team_size": {
+        "required_team_size": {
           "type": [
             "integer",
             "null"
@@ -2026,7 +2033,7 @@
                 }
               ]
             },
-            "require_team_size": {
+            "required_team_size": {
               "type": [
                 "integer",
                 "null"
