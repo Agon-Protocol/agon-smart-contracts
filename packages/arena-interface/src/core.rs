@@ -27,6 +27,7 @@ pub struct InstantiateExt {
     pub tax_configuration: TaxConfiguration,
     pub rating_period: Duration,
     pub payment_registry: Option<String>,
+    pub discord_identity: Option<String>,
 }
 
 #[cw_serde]
@@ -59,6 +60,9 @@ pub enum ExecuteExt {
         to_remove: Option<Vec<String>>,
     },
     SetPaymentRegistry {
+        addr: String,
+    },
+    SetDiscordIdentity {
         addr: String,
     },
 }
@@ -121,8 +125,10 @@ pub enum QueryExt {
     },
     #[returns(Option<Duration>)]
     RatingPeriod {},
-    #[returns(Addr)]
+    #[returns(Option<Addr>)]
     PaymentRegistry {},
+    #[returns(Option<Addr>)]
+    DiscordIdentity {},
 }
 
 impl From<QueryExt> for QueryMsg {
