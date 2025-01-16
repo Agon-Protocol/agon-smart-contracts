@@ -3,7 +3,7 @@ use arena_interface::competition::{
     state::{Competition, CompetitionResponse},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::Empty;
+use cosmwasm_std::{Addr, Empty};
 
 #[cw_serde]
 #[derive(cw_orch::ExecuteFns)]
@@ -46,6 +46,7 @@ pub enum APIProcessing {
     Yunite {
         guild_id: String,
         tournament_id: String,
+        avs: Addr,
     },
 }
 

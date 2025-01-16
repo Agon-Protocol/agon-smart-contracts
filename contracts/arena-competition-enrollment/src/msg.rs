@@ -65,7 +65,7 @@ pub enum AdditionalInfo {
 
 #[cw_serde]
 pub enum AdditionalWagerInfo {
-    Yunite { tournament_id: String },
+    Yunite { tournament_id: String, avs: String },
 }
 
 #[cw_serde]

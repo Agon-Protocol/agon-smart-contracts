@@ -398,11 +398,13 @@ pub fn finalize(
                                 match additional_info {
                                     AdditionalInfo::Wager(additional_wager_info) => {
                                         match additional_wager_info {
-                                            AdditionalWagerInfo::Yunite { tournament_id } => {
+                                            AdditionalWagerInfo::Yunite { tournament_id, avs } => {
+                                                let avs = deps.api.addr_validate(&avs)?;
                                                 WagerInstantiateExt {
                                                     api_processing: Some(APIProcessing::Yunite {
                                                         guild_id: guild_id.clone(),
                                                         tournament_id,
+                                                        avs,
                                                     }),
                                                 }
                                             }
