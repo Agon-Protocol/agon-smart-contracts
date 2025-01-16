@@ -8,7 +8,7 @@ use arena_interface::{
 };
 use arena_league_module::msg::LeagueInstantiateExt;
 use arena_tournament_module::{msg::TournamentInstantiateExt, state::EliminationType};
-use arena_wager_module::msg::WagerInstantiateExt;
+use arena_wager_module::msg::{APIProcessing, WagerInstantiateExt};
 use cosmwasm_std::{
     ensure, instantiate2_address, to_json_binary, Addr, Attribute, BlockInfo, Coin, CosmosMsg,
     DepsMut, Env, MessageInfo, Response, StdError, StdResult, SubMsg, Timestamp, Uint128, Uint64,
@@ -20,10 +20,10 @@ use itertools::Itertools as _;
 use sha2::{Digest, Sha256};
 
 use crate::{
-    msg::CompetitionInfoMsg,
+    msg::{AdditionalInfo, AdditionalWagerInfo, CompetitionInfoMsg},
     state::{
         enrollment_entries, CompetitionInfo, CompetitionType, EnrollmentEntry, EnrollmentInfo,
-        ENROLLMENT_COUNT, TEMP_ENROLLMENT_INFO,
+        WagerAPIProcessing, ENROLLMENT_COUNT, TEMP_ENROLLMENT_INFO,
     },
     ContractError,
 };
@@ -271,6 +271,7 @@ pub fn finalize(
     env: Env,
     info: MessageInfo,
     id: Uint128,
+    additional_info: Option<AdditionalInfo>,
 ) -> Result<Response, ContractError> {
     // Load enrollment entry from storage
     let enrollment = enrollment_entries().load(deps.storage, id.u128())?;
@@ -388,7 +389,34 @@ pub fn finalize(
 
             // Create appropriate competition message based on type
             match &enrollment.competition_type {
-                CompetitionType::Wager {} => {
+                CompetitionType::Wager { api_processing } => {
+                    let extension = if let Some(api_processing) = api_processing {
+                        match api_processing {
+                            WagerAPIProcessing::Yunite { guild_id } => {
+                                let additional_info = additional_info.ok_or(StdError::generic_err("Additional information should be provided when the wager has api processing"))?;
+
+                                match additional_info {
+                                    AdditionalInfo::Wager(additional_wager_info) => {
+                                        match additional_wager_info {
+                                            AdditionalWagerInfo::Yunite { tournament_id } => {
+                                                WagerInstantiateExt {
+                                                    api_processing: Some(APIProcessing::Yunite {
+                                                        guild_id: guild_id.clone(),
+                                                        tournament_id,
+                                                    }),
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    } else {
+                        WagerInstantiateExt {
+                            api_processing: None,
+                        }
+                    };
+
                     to_json_binary(&arena_wager_module::msg::ExecuteMsg::CreateCompetition {
                         host: Some(enrollment.host.to_string()),
                         category_id: enrollment.category_id,
@@ -400,7 +428,7 @@ pub fn finalize(
                         rules: rules.clone(),
                         rulesets: rulesets.clone(),
                         banner: banner.clone(),
-                        instantiate_extension: WagerInstantiateExt {},
+                        instantiate_extension: extension,
                         group_contract: group_info.clone(),
                     })?
                 }
@@ -721,7 +749,7 @@ pub fn _withdraw(
 
 fn get_min_min_members(competition_type: &CompetitionType) -> Uint64 {
     match competition_type {
-        CompetitionType::Wager {} => Uint64::new(2),
+        CompetitionType::Wager { .. } => Uint64::new(2),
         CompetitionType::League { distribution, .. } => {
             Uint64::new(std::cmp::max(distribution.len(), 2) as u64)
         }

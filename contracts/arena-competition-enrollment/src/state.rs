@@ -98,8 +98,15 @@ impl EnrollmentEntry {
 }
 
 #[cw_serde]
+pub enum WagerAPIProcessing {
+    Yunite { guild_id: String },
+}
+
+#[cw_serde]
 pub enum CompetitionType {
-    Wager {},
+    Wager {
+        api_processing: Option<WagerAPIProcessing>,
+    },
     League {
         match_win_points: Uint64,
         match_draw_points: Uint64,
@@ -116,7 +123,7 @@ impl fmt::Display for CompetitionType {
     /// This value should match up the module key
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CompetitionType::Wager {} => write!(f, "Wagers"),
+            CompetitionType::Wager { .. } => write!(f, "Wagers"),
             CompetitionType::League { .. } => write!(f, "Leagues"),
             CompetitionType::Tournament { .. } => write!(f, "Tournaments"),
         }

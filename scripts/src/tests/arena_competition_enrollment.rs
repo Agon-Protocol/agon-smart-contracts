@@ -165,7 +165,7 @@ fn test_competition_enrollment() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .finalize(Uint128::one())?;
+        .finalize(Uint128::one(), None)?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -373,7 +373,7 @@ fn test_tournament() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .finalize(Uint128::one())?;
+        .finalize(Uint128::one(), None)?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -463,7 +463,9 @@ fn test_wager() -> anyhow::Result<()> {
             rulesets: None,
             banner: None,
         },
-        competition_type: CompetitionType::Wager {},
+        competition_type: CompetitionType::Wager {
+            api_processing: None,
+        },
         group_contract_info: ModuleInstantiateInfo {
             code_id: arena.arena_group.code_id()?,
             msg: to_json_binary(&group::InstantiateMsg { members: None })?,
@@ -505,7 +507,7 @@ fn test_wager() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .finalize(Uint128::one())?;
+        .finalize(Uint128::one(), None)?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -625,7 +627,7 @@ fn test_successful_league_creation() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .finalize(Uint128::one())?;
+        .finalize(Uint128::one(), None)?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
@@ -716,7 +718,7 @@ fn test_finalize_before_min_members() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .finalize(Uint128::one())?;
+        .finalize(Uint128::one(), None)?;
 
     // Check that the competition was not created
     assert!(res.events.iter().any(|e| e.ty == "wasm"
@@ -811,7 +813,7 @@ fn test_unregistered_competition_enrollment() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .finalize(Uint128::one())?;
+        .finalize(Uint128::one(), None)?;
 
     // Check that the competition was not created due to reply on error
     assert!(res
@@ -915,7 +917,7 @@ fn test_huge_tournament() -> anyhow::Result<()> {
 
     let res = arena
         .arena_competition_enrollment
-        .finalize(Uint128::one())?;
+        .finalize(Uint128::one(), None)?;
     assert!(res.events.iter().any(|e| e.ty == "wasm"
         && e.attributes
             .iter()
