@@ -3,11 +3,16 @@ use arena_interface::competition::{
     state::{Competition, CompetitionResponse},
 };
 use cosmwasm_schema::{cw_serde, QueryResponses};
-use cosmwasm_std::{Addr, Empty};
+use cosmwasm_std::{Addr, Empty, Uint128};
 
 #[cw_serde]
 #[derive(cw_orch::ExecuteFns)]
-pub enum ExecuteExt {}
+pub enum ExecuteExt {
+    ProcessCompetitionAPI {
+        competition_id: Uint128,
+        result: serde_json::Value,
+    },
+}
 
 impl From<ExecuteExt> for ExecuteMsg {
     fn from(msg: ExecuteExt) -> Self {

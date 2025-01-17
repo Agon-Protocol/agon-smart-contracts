@@ -327,6 +327,7 @@ dependencies = [
  "cw-competition-base",
  "cw-orch",
  "cw2 1.1.2",
+ "serde_json",
 ]
 
 [[package]]
